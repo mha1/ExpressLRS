@@ -21,6 +21,7 @@
 #include "rx-serial/SerialSBUS.h"
 #include "rx-serial/SerialSUMD.h"
 #include "rx-serial/SerialAirPort.h"
+#include "rx-serial/SerialHoTT_TLM.h"
 
 #include "rx-serial/devSerialIO.h"
 #include "devLED.h"
@@ -1161,6 +1162,7 @@ static void setupSerial()
 {
     bool sbusSerialOutput = false;
 	bool sumdSerialOutput = false;
+    bool hottTlmSerial = false;
 
     if (OPT_CRSF_RCVR_NO_SERIAL)
     {
@@ -1185,6 +1187,11 @@ static void setupSerial()
         sumdSerialOutput = true;
         serialBaud = 115200;
     }
+	else if (config.GetSerialProtocol() == PROTOCOL_HOTT_TLM)
+    {
+        hottTlmSerial = true;
+        serialBaud = 19200;
+    }    
     bool invert = config.GetSerialProtocol() == PROTOCOL_SBUS || config.GetSerialProtocol() == PROTOCOL_INVERTED_CRSF || config.GetSerialProtocol() == PROTOCOL_DJI_RS_PRO;
 
 #ifdef PLATFORM_STM32
@@ -1258,6 +1265,10 @@ static void setupSerial()
     else if (sumdSerialOutput)
     {
         serialIO = new SerialSUMD(SERIAL_PROTOCOL_TX, SERIAL_PROTOCOL_RX);
+    }
+    else if (hottTlmSerial)
+    {
+        serialIO = new SerialHoTT_TLM(SERIAL_PROTOCOL_TX, SERIAL_PROTOCOL_RX);
     }
     else
     {
