@@ -34,8 +34,8 @@ typedef struct {
 	uint16_t Lon_DegMin		= 0;						// 15 09D25' = 0925 = 0x039D
 	uint16_t Lon_Sec    	= 0;						// 17 9360'' = 9360 = 0x2490
 	uint16_t Distance		= 0;						// 19 1 = 1m
-	uint16_t Altitude 		= 500;						// 21 500 = 0m
-	uint16_t m_per_sec 		= 30000;					// 23 30000 = 0.00m/s (1 = 0.01m/s)
+	int16_t  Altitude 		= 500;						// 21 500 = 0m
+	int16_t  m_per_sec 		= 30000;					// 23 30000 = 0.00m/s (1 = 0.01m/s)
 	uint8_t  m_per_3sec 	= 120;					    // 25 120 = 0m/3s (1 = 1m/3s)
 	uint8_t  Satellites 	= 0;					    // 26 n visible satellites
 	uint8_t  FixChar 		= 2;					    // 27 GPS fix character. Display if DGPS, 2D oder 3D
@@ -55,7 +55,7 @@ typedef struct {
 	uint8_t  Version 		= 0;        				// 42 version number
 	uint8_t  EndByte 		= END_FRAME;        		// 43 0x7D
 	uint8_t  CRC 			= 0x00;            			// 44 CRC
-} GPSPacket_t; 
+} PACKED GPSPacket_t; 
 
 static bool reconfigured = false;
 EspSoftwareSerial::UART myPort;
@@ -86,28 +86,25 @@ int SerialHoTT_TLM::getMaxSerialReadSize()
 }
 
 static uint8_t _size = 0;
-uint8_t buf[64];
-static uint32_t n = 500;
+static uint8_t buf[128];
+static GPSPacket_t gps;
+
 
 void SerialHoTT_TLM::processBytes(uint8_t *bytes, uint16_t size)
-{
-    if (connectionState == connected && reconfigured)
-    {
-        while(myPort.available() && _size < 64)
-            buf[_size++] = myPort.read();
-    }
-
-    static uint16_t hottAltitude = 234;
-
-    if(_size == 45) {
-        _size = 0;
-
-        hottAltitude = ((GPSPacket_t *)&buf)->Altitude;
-        //hottAltitude = 0+n; n++;
-    }
-
+{  
     static uint32_t lastTLMsent = 0;
     uint32_t now = micros();
+
+    while(myPort.available() && _size < 64)
+        buf[_size++] = (uint8_t)myPort.read();
+
+    if(_size > 63) 
+        _size = 0;
+
+    if(_size == 45) {
+        memcpy(&gps, &buf[0], 45);
+        _size = 0;
+    }
 
     if(now < lastTLMsent + 100000)
         return;
@@ -116,9 +113,8 @@ void SerialHoTT_TLM::processBytes(uint8_t *bytes, uint16_t size)
 
     CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
 
-    crsfBaro.p.altitude = htobe16((buf[21]+buf[22]*256) - 500 + 10000);
-    //crsfBaro.p.verticalspd = htobe16(174);
-    crsfBaro.p.verticalspd = htobe16(_size*10);
+    crsfBaro.p.altitude = htobe16((gps.Altitude - 500)*10 + 10000);
+    crsfBaro.p.verticalspd = htobe16(gps.m_per_sec - 30000);
 
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
     telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
@@ -136,15 +132,6 @@ void SerialHoTT_TLM::handleUARTout()
         _size = 0;
     }
 
-/*
-    uint8_t size = hottInputBuffer.size();
-
-    if(hottInputBuffer.size()) {
-        uint8_t buf[size];
-        hottInputBuffer.popBytes(buf, size);
-        _outputPort->write(buf, size);
-    }
-*/
     static uint32_t lastPoll = 0;
     uint32_t now = micros();
 
@@ -154,13 +141,21 @@ void SerialHoTT_TLM::handleUARTout()
     lastPoll = now;    
 
     uint8_t buf[2] = { 0x80, 0x8a};
-    hottInputBuffer.flush();
+    _size = 0;
 
     myPort.enableTx(true);
     myPort.write(buf, 2);
-    _size = 0;
     myPort.enableTx(false);
 
+/*
+    uint8_t size = hottInputBuffer.size();
+
+    if(hottInputBuffer.size()) {
+        uint8_t buf[size];
+        hottInputBuffer.popBytes(buf, size);
+        _outputPort->write(buf, size);
+    }
+*/
 /*
     auto size = hottOutputBuffer.size();
     uint8_t buf[size];
