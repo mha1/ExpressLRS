@@ -1,10 +1,8 @@
 #if defined(TARGET_RX)
 
 #include "SerialHoTT_TLM.h"
-#include "device.h"
 #include "common.h"
 #include "telemetry.h"
-#include "ESPSoftwareSerial.h"
 
 extern Telemetry telemetry;
 
@@ -57,46 +55,18 @@ typedef struct {
 	uint8_t  CRC 			= 0x00;            			// 44 CRC
 } PACKED GPSPacket_t; 
 
-static bool reconfigured = false;
-EspSoftwareSerial::UART myPort;
-
-void SerialHoTT_TLM::setLinkQualityStats(uint16_t lq, uint16_t rssi)
-{
-    // unsupported
-}
-
-void SerialHoTT_TLM::sendLinkStatisticsToFC()
-{
-    // unsupported
-}
-
-uint32_t SerialHoTT_TLM::sendRCFrameToFC(bool frameAvailable, uint32_t *channelData)
-{
-    return DURATION_IMMEDIATELY;
-}
-
-void SerialHoTT_TLM::sendMSPFrameToFC(uint8_t* data)
-{
-    // unsupported
-}
-
-int SerialHoTT_TLM::getMaxSerialReadSize()
-{
-    return AP_MAX_BUF_LEN - hottInputBuffer.size();
-}
-
 static uint8_t _size = 0;
 static uint8_t buf[128];
 static GPSPacket_t gps;
 
 
-void SerialHoTT_TLM::processBytes(uint8_t *bytes, uint16_t size)
+void SerialHoTT_TLM::handleUARTin()
 {  
     static uint32_t lastTLMsent = 0;
-    uint32_t now = micros();
+    uint32_t now = millis();
 
-    while(myPort.available() && _size < 64)
-        buf[_size++] = (uint8_t)myPort.read();
+    while(hottTLMport.available() && _size < 64)
+        buf[_size++] = (uint8_t)hottTLMport.read();
 
     if(_size > 63) 
         _size = 0;
@@ -104,9 +74,18 @@ void SerialHoTT_TLM::processBytes(uint8_t *bytes, uint16_t size)
     if(_size == 45) {
         memcpy(&gps, &buf[0], 45);
         _size = 0;
+
+        CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
+
+        crsfBaro.p.altitude = htobe16((gps.Altitude - 500)*10 + 10000);
+        crsfBaro.p.verticalspd = htobe16(gps.m_per_sec - 30000);
+
+        CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+        telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
     }
 
-    if(now < lastTLMsent + 100000)
+/*
+    if(now < lastTLMsent + 100)
         return;
 
     lastTLMsent = now; 
@@ -118,24 +97,15 @@ void SerialHoTT_TLM::processBytes(uint8_t *bytes, uint16_t size)
 
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
     telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
+*/
 }
 
 void SerialHoTT_TLM::handleUARTout()
 {
-    if(!reconfigured) {
-        Serial.end();
-
-        myPort.begin(19200, SWSERIAL_8E1, GPIO_PIN_RCSIGNAL_TX, GPIO_PIN_RCSIGNAL_TX, false);
-        myPort.enableTx(false);
-
-        reconfigured = true;
-        _size = 0;
-    }
-
     static uint32_t lastPoll = 0;
-    uint32_t now = micros();
+    uint32_t now = millis();
 
-    if(now < lastPoll + 70000)
+    if(now < lastPoll + 70)
         return;
 
     lastPoll = now;    
@@ -143,9 +113,9 @@ void SerialHoTT_TLM::handleUARTout()
     uint8_t buf[2] = { 0x80, 0x8a};
     _size = 0;
 
-    myPort.enableTx(true);
-    myPort.write(buf, 2);
-    myPort.enableTx(false);
+    hottTLMport.enableTx(true);
+    hottTLMport.write(buf, 2);
+    hottTLMport.enableTx(false);
 
 /*
     uint8_t size = hottInputBuffer.size();
