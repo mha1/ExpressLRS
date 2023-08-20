@@ -34,8 +34,8 @@ typedef struct {
 	uint16_t Lon_DegMin		= 0;						// 15 09D25' = 0925 = 0x039D
 	uint16_t Lon_Sec    	= 0;						// 17 9360'' = 9360 = 0x2490
 	uint16_t Distance		= 0;						// 19 1 = 1m
-	int16_t  Altitude 		= 500;						// 21 500 = 0m
-	int16_t  m_per_sec 		= 30000;					// 23 30000 = 0.00m/s (1 = 0.01m/s)
+	uint16_t Altitude 		= 500;						// 21 500 = 0m
+	uint16_t m_per_sec 	    = 30000;					// 23 30000 = 0.00m/s (1 = 0.01m/s)
 	uint8_t  m_per_3sec 	= 120;					    // 25 120 = 0m/3s (1 = 1m/3s)
 	uint8_t  Satellites 	= 0;					    // 26 n visible satellites
 	uint8_t  FixChar 		= 2;					    // 27 GPS fix character. Display if DGPS, 2D oder 3D
