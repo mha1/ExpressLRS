@@ -6,12 +6,7 @@
 
 class SerialHoTT_TLM : public SerialIO {
 public:
-    explicit SerialHoTT_TLM(Stream &out, Stream &in) : SerialIO(&out, &in) {
-        Serial.end();
-
-        hottTLMport.begin(19200, SWSERIAL_8E1, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_RX, false);
-        hottTLMport.enableTx(false);
-    }
+    explicit SerialHoTT_TLM(Stream &out, Stream &in) : SerialIO(&out, &in) {}
 
     virtual ~SerialHoTT_TLM() {
         hottTLMport.end();

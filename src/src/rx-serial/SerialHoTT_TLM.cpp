@@ -66,26 +66,22 @@ void SerialHoTT_TLM::handleUARTout()
     static uint32_t lastPoll = 0;
     uint32_t now = millis();
 
-    if(now >= lastPoll + 70) {
+    if(now >= lastPoll + HOTT_POLL_RATE) {
         lastPoll = now;    
 
         poll(SENSOR_ID_GPS_B);
-
-        return;
     }
 
-    if(!hottTLMport.available())
+    if(!Serial.available())
         return;
     
-    hottTLMframe[size++] = hottTLMport.read();
+    hottTLMframe[size++] = Serial.read();
 
     if(size == FRAME_SIZE) {
         size = 0;
 
-        hottTLMport.enableRx(false); 
-
-        //if(hottTLMframe[44] != calcFrameCRC(hottTLMframe))
-        //    return;
+        if(hottTLMframe[44] != calcFrameCRC(hottTLMframe))
+            return;
 
         switch(hottTLMframe[1]) {
             case SENSOR_ID_GPS_B: {
@@ -106,13 +102,22 @@ void SerialHoTT_TLM::handleUARTout()
 }
 
 void SerialHoTT_TLM::poll(uint8_t id) {
+    Serial.end();
+
+    hottTLMport.begin(19200, SWSERIAL_8E1, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_RX, false);
     hottTLMport.enableTx(true);
     hottTLMport.write(SENSOR_REQUEST_B);
     hottTLMport.write(id);
     hottTLMport.enableTx(false);
+    hottTLMport.end();
 
     size = 0;
-    hottTLMport.flush(); 
+
+#if defined(PLATFORM_ESP8266)
+    Serial.begin(19200, SERIAL_8E1, SERIAL_FULL, -1, false);
+#elif defined(PLATFORM_ESP32)
+    Serial.begin(19200, SERIAL_8N1, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_TX, false);
+#endif
 }
 
 void SerialHoTT_TLM::AppendTLMpacket(uint8_t *telemetryPacket) {             
