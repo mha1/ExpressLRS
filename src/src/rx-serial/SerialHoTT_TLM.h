@@ -1,19 +1,15 @@
 #include "SerialIO.h"
 #include "FIFO_GENERIC.h"
 #include "telemetry_protocol.h"
-#include "ESPSoftwareSerial.h"
+#include <SoftwareSerial.h>
 #include "device.h"
-
-// Variables / constants for HoTT telemetry //
-extern FIFO_GENERIC<AP_MAX_BUF_LEN> hottInputBuffer;
-extern FIFO_GENERIC<AP_MAX_BUF_LEN> hottOutputBuffer;
 
 class SerialHoTT_TLM : public SerialIO {
 public:
     explicit SerialHoTT_TLM(Stream &out, Stream &in) : SerialIO(&out, &in) {
         Serial.end();
 
-        hottTLMport.begin(19200, SWSERIAL_8E1, GPIO_PIN_RCSIGNAL_TX, GPIO_PIN_RCSIGNAL_TX, false);
+        hottTLMport.begin(19200, SWSERIAL_8E1, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_RX, false);
         hottTLMport.enableTx(false);
     }
 
@@ -32,6 +28,9 @@ public:
 private:
     void processBytes(uint8_t *bytes, u_int16_t size) override {};
     void processByte(uint8_t byte) override {};
-    
+
+    void AppendTLMpacket(uint8_t *telemetryPacket);
+    uint8_t calcFrameCRC(uint8_t *buf);
+
     EspSoftwareSerial::UART hottTLMport;
 };

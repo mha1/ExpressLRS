@@ -6,15 +6,15 @@
 
 extern Telemetry telemetry;
 
-
 // Variables / constants for HoTT telemetry //
-FIFO_GENERIC<AP_MAX_BUF_LEN> hottInputBuffer;
-FIFO_GENERIC<AP_MAX_BUF_LEN> hottOutputBuffer;
 
-#define SENSOR_ID_GPS_B 	0x8A  	// our telemetry ID fake GPS module
+#define HOTT_POLL_RATE      70      // HoTT bus poll rate [ms]
+#define FRAME_SIZE          45      // HoTT telemetry frame size
+#define SENSOR_REQUEST_B    0x80    // request sensor data 
+#define SENSOR_ID_GPS_B 	0x8A  	// GPS module ID
 #define SENSOR_ID_GPS_T		0xA0  	// sensor ID for text mode adressing
-#define START_FRAME_B   	0x7C  		// HoTT start of frame marker
-#define END_FRAME			0x7D  		// HoTT end of frame marker
+#define START_FRAME_B   	0x7C  	// HoTT start of frame marker
+#define END_FRAME			0x7D  	// HoTT end of frame marker
 
 typedef struct {
 	uint8_t  StartByte 		= START_FRAME_B;      		//  0 0x7C
@@ -52,52 +52,50 @@ typedef struct {
 	uint8_t  ASCII3			= '-';						// 41 free ASCII character 3
 	uint8_t  Version 		= 0;        				// 42 version number
 	uint8_t  EndByte 		= END_FRAME;        		// 43 0x7D
-	uint8_t  CRC 			= 0x00;            			// 44 CRC
+	uint8_t  CRC 			= 0x00;            			// 44 CRC  
 } PACKED GPSPacket_t; 
 
-static uint8_t _size = 0;
-static uint8_t buf[128];
-static GPSPacket_t gps;
+FIFO_GENERIC<AP_MAX_BUF_LEN> hottInputBuffer;
+
+static uint8_t hottTLMframe[FRAME_SIZE];
+
+CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
 
 
 void SerialHoTT_TLM::handleUARTin()
 {  
-    static uint32_t lastTLMsent = 0;
-    uint32_t now = millis();
+    uint8_t bytesAvailable = hottTLMport.available();
 
-    while(hottTLMport.available() && _size < 64)
-        buf[_size++] = (uint8_t)hottTLMport.read();
+    if(bytesAvailable) {
+        uint8_t buf[bytesAvailable];
 
-    if(_size > 63) 
-        _size = 0;
+        hottTLMport.readBytes(buf, bytesAvailable);
+        hottInputBuffer.pushBytes(buf, bytesAvailable);
 
-    if(_size == 45) {
-        memcpy(&gps, &buf[0], 45);
-        _size = 0;
+        if(hottInputBuffer.size() == FRAME_SIZE) {
+            hottInputBuffer.popBytes(hottTLMframe, FRAME_SIZE);
+            hottInputBuffer.flush();
 
-        CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
+            if(hottTLMframe[0] != START_FRAME_B || hottTLMframe[44] != calcFrameCRC(hottTLMframe))
+                return;
 
-        crsfBaro.p.altitude = htobe16((gps.Altitude - 500)*10 + 10000);
-        crsfBaro.p.verticalspd = htobe16(gps.m_per_sec - 30000);
+            switch(hottTLMframe[1]) {
+                case SENSOR_ID_GPS_B: {
+                    GPSPacket_t *gps = ((GPSPacket_t *)hottTLMframe);
 
-        CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
-        telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
+                    crsfBaro.p.altitude    = htobe16(gps->Altitude * 10 + 5000);
+                    crsfBaro.p.verticalspd = htobe16(gps->m_per_sec - 30000);
+
+                    AppendTLMpacket((uint8_t *)&crsfBaro);
+
+                    break;
+                }
+
+                default:
+                    break;
+            }
+        }
     }
-
-/*
-    if(now < lastTLMsent + 100)
-        return;
-
-    lastTLMsent = now; 
-
-    CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
-
-    crsfBaro.p.altitude = htobe16((gps.Altitude - 500)*10 + 10000);
-    crsfBaro.p.verticalspd = htobe16(gps.m_per_sec - 30000);
-
-    CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
-    telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
-*/
 }
 
 void SerialHoTT_TLM::handleUARTout()
@@ -105,32 +103,27 @@ void SerialHoTT_TLM::handleUARTout()
     static uint32_t lastPoll = 0;
     uint32_t now = millis();
 
-    if(now < lastPoll + 70)
-        return;
+    if(now >= lastPoll + 70) {
+        lastPoll = now;    
 
-    lastPoll = now;    
-
-    uint8_t buf[2] = { 0x80, 0x8a};
-    _size = 0;
-
-    hottTLMport.enableTx(true);
-    hottTLMport.write(buf, 2);
-    hottTLMport.enableTx(false);
-
-/*
-    uint8_t size = hottInputBuffer.size();
-
-    if(hottInputBuffer.size()) {
-        uint8_t buf[size];
-        hottInputBuffer.popBytes(buf, size);
-        _outputPort->write(buf, size);
+        hottTLMport.enableTx(true);
+        hottTLMport.write(SENSOR_REQUEST_B);
+        hottTLMport.write(SENSOR_ID_GPS_B);
+        hottInputBuffer.flush();
+        hottTLMport.enableTx(false);
     }
-*/
-/*
-    auto size = hottOutputBuffer.size();
-    uint8_t buf[size];
-    hottOutputBuffer.popBytes(buf, size);
-    _outputPort->write(buf, size);
-*/
+}
+
+void SerialHoTT_TLM::AppendTLMpacket(uint8_t *telemetryPacket) {             
+    CRSF::SetHeaderAndCrc(telemetryPacket, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+    telemetry.AppendTelemetryPackage(telemetryPacket);
+}
+
+uint8_t SerialHoTT_TLM::calcFrameCRC(uint8_t *buf) {
+    uint16_t sum = 0;
+        
+    for(uint8_t i = 0 ; i < FRAME_SIZE-1; i++)
+        sum += buf[i];
+    return sum = sum & 0xff;
 }
 #endif
