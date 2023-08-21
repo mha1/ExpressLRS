@@ -55,9 +55,8 @@ typedef struct {
 	uint8_t  CRC 			= 0x00;            			// 44 CRC  
 } PACKED GPSPacket_t; 
 
-FIFO_GENERIC<AP_MAX_BUF_LEN> hottInputBuffer;
-
 static uint8_t hottTLMframe[FRAME_SIZE];
+static uint8_t size = 0;
 
 CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
 
@@ -71,48 +70,49 @@ void SerialHoTT_TLM::handleUARTout()
         lastPoll = now;    
 
         poll(SENSOR_ID_GPS_B);
+
+        return;
     }
 
-    uint8_t bytesAvailable = hottTLMport.available();
+    if(!hottTLMport.available())
+        return;
+    
+    hottTLMframe[size++] = hottTLMport.read();
 
-    if(bytesAvailable) {
-        uint8_t buf[bytesAvailable];
+    if(size == FRAME_SIZE) {
+        size = 0;
 
-        hottTLMport.readBytes(buf, bytesAvailable);
-        hottInputBuffer.pushBytes(buf, bytesAvailable);
+        hottTLMport.enableRx(false); 
 
-        if(hottInputBuffer.size() == FRAME_SIZE) {
-            hottInputBuffer.popBytes(hottTLMframe, FRAME_SIZE);
-            hottInputBuffer.flush();
+        //if(hottTLMframe[44] != calcFrameCRC(hottTLMframe))
+        //    return;
 
-            if(hottTLMframe[0] != START_FRAME_B || hottTLMframe[44] != calcFrameCRC(hottTLMframe))
-                return;
+        switch(hottTLMframe[1]) {
+            case SENSOR_ID_GPS_B: {
+                GPSPacket_t *gps = ((GPSPacket_t *)hottTLMframe);
 
-            switch(hottTLMframe[1]) {
-                case SENSOR_ID_GPS_B: {
-                    GPSPacket_t *gps = ((GPSPacket_t *)hottTLMframe);
+                crsfBaro.p.altitude    = htobe16(gps->Altitude * 10 + 5000);
+                crsfBaro.p.verticalspd = htobe16(gps->m_per_sec - 30000);
 
-                    crsfBaro.p.altitude    = htobe16(gps->Altitude * 10 + 5000);
-                    crsfBaro.p.verticalspd = htobe16(gps->m_per_sec - 30000);
+                AppendTLMpacket((uint8_t *)&crsfBaro);
 
-                    AppendTLMpacket((uint8_t *)&crsfBaro);
-
-                    break;
-                }
-
-                default:
-                    break;
+                break;
             }
+
+            default:
+                break;
         }
     }
 }
 
-void SerialHoTT_TLM::poll(uint8_t id) { 
+void SerialHoTT_TLM::poll(uint8_t id) {
     hottTLMport.enableTx(true);
     hottTLMport.write(SENSOR_REQUEST_B);
     hottTLMport.write(id);
-    hottInputBuffer.flush();
     hottTLMport.enableTx(false);
+
+    size = 0;
+    hottTLMport.flush(); 
 }
 
 void SerialHoTT_TLM::AppendTLMpacket(uint8_t *telemetryPacket) {             
