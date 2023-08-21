@@ -62,8 +62,17 @@ static uint8_t hottTLMframe[FRAME_SIZE];
 CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
 
 
-void SerialHoTT_TLM::handleUARTin()
+void SerialHoTT_TLM::handleUARTout()
 {  
+    static uint32_t lastPoll = 0;
+    uint32_t now = millis();
+
+    if(now >= lastPoll + 70) {
+        lastPoll = now;    
+
+        poll(SENSOR_ID_GPS_B);
+    }
+
     uint8_t bytesAvailable = hottTLMport.available();
 
     if(bytesAvailable) {
@@ -98,20 +107,12 @@ void SerialHoTT_TLM::handleUARTin()
     }
 }
 
-void SerialHoTT_TLM::handleUARTout()
-{
-    static uint32_t lastPoll = 0;
-    uint32_t now = millis();
-
-    if(now >= lastPoll + 70) {
-        lastPoll = now;    
-
-        hottTLMport.enableTx(true);
-        hottTLMport.write(SENSOR_REQUEST_B);
-        hottTLMport.write(SENSOR_ID_GPS_B);
-        hottInputBuffer.flush();
-        hottTLMport.enableTx(false);
-    }
+void SerialHoTT_TLM::poll(uint8_t id) { 
+    hottTLMport.enableTx(true);
+    hottTLMport.write(SENSOR_REQUEST_B);
+    hottTLMport.write(id);
+    hottInputBuffer.flush();
+    hottTLMport.enableTx(false);
 }
 
 void SerialHoTT_TLM::AppendTLMpacket(uint8_t *telemetryPacket) {             

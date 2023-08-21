@@ -21,14 +21,15 @@ public:
     uint32_t sendRCFrameToFC(bool frameAvailable, uint32_t *channelData) override { return DURATION_IMMEDIATELY; }; 
     void sendMSPFrameToFC(uint8_t* data) override {};
     void sendLinkStatisticsToFC() override {};
+    void handleUARTin() override {};
 
-    void handleUARTin() override;
     void handleUARTout() override;
 
 private:
     void processBytes(uint8_t *bytes, u_int16_t size) override {};
     void processByte(uint8_t byte) override {};
 
+    void poll(uint8_t id);
     void AppendTLMpacket(uint8_t *telemetryPacket);
     uint8_t calcFrameCRC(uint8_t *buf);
 
