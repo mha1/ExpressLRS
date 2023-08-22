@@ -25,8 +25,23 @@ private:
     void processByte(uint8_t byte) override {};
 
     void poll(uint8_t id);
-    void AppendTLMpacket(uint8_t *telemetryPacket);
     uint8_t calcFrameCRC(uint8_t *buf);
+    
+    void sendCRSFtelemetry();
+
+    uint16_t getHoTTvoltage();
+    uint16_t getHoTTcurrent();
+    uint32_t getHoTTcapacity();
+    int16_t getHoTTaltitude();
+    int16_t getHoTTvv();
+    uint8_t getHoTTremaining();
+    int32_t  getHoTTlatitude();
+    int32_t  getHoTTlongitude();
+    uint16_t getHoTTgroundspeed();
+    uint16_t getHoTTheading();
+    uint8_t  getHoTTsatellites();
+
+    uint32_t htobe24(uint32_t val);
 
     EspSoftwareSerial::UART hottTLMport;
 };
