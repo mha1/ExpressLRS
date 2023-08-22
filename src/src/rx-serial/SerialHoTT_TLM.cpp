@@ -8,6 +8,7 @@ extern Telemetry telemetry;
 
 // Variables / constants for HoTT telemetry //
 
+#define HOTT_BAUD_RATE      19200
 #define HOTT_POLL_RATE      70      // HoTT bus poll rate [ms]
 #define FRAME_SIZE          45      // HoTT telemetry frame size
 #define SENSOR_REQUEST_B    0x80    // request sensor data 
@@ -63,11 +64,11 @@ CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
 
 void SerialHoTT_TLM::handleUARTout()
 {  
-    static uint32_t lastPoll = 0;
     uint32_t now = millis();
+    static uint32_t nextPoll = now + HOTT_POLL_RATE;
 
-    if(now >= lastPoll + HOTT_POLL_RATE) {
-        lastPoll = now;    
+    if(now >= nextPoll) {
+        nextPoll = now + HOTT_POLL_RATE;    
 
         poll(SENSOR_ID_GPS_B);
     }
@@ -75,7 +76,8 @@ void SerialHoTT_TLM::handleUARTout()
     if(!Serial.available())
         return;
     
-    hottTLMframe[size++] = Serial.read();
+    while(Serial.available())
+        hottTLMframe[size++] = Serial.read();
 
     if(size == FRAME_SIZE) {
         size = 0;
@@ -104,19 +106,17 @@ void SerialHoTT_TLM::handleUARTout()
 void SerialHoTT_TLM::poll(uint8_t id) {
     Serial.end();
 
-    hottTLMport.begin(19200, SWSERIAL_8E1, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_RX, false);
-    hottTLMport.enableTx(true);
+    hottTLMport.begin(HOTT_BAUD_RATE, SWSERIAL_8N2, -1, GPIO_PIN_RCSIGNAL_RX, false);
     hottTLMport.write(SENSOR_REQUEST_B);
     hottTLMport.write(id);
-    hottTLMport.enableTx(false);
     hottTLMport.end();
 
     size = 0;
 
 #if defined(PLATFORM_ESP8266)
-    Serial.begin(19200, SERIAL_8E1, SERIAL_FULL, -1, false);
+    Serial.begin(HOTT_BAUD_RATE, SERIAL_8N1, SERIAL_FULL, -1, false);
 #elif defined(PLATFORM_ESP32)
-    Serial.begin(19200, SERIAL_8N1, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_TX, false);
+    Serial.begin(HOTT_BAUD_RATE, SERIAL_8N1, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_TX, false);
 #endif
 }
 
