@@ -9,7 +9,7 @@ extern Telemetry telemetry;
 #define HOTT_BAUD_RATE      19200
 
 #define HOTT_POLL_RATE      160     // HoTT bus poll rate [ms]
-#define CRSF_TELEMETRY_RATE 100     // CRSF telemetry packet delivery rate
+#define CRSF_TELEMETRY_RATE 160     // CRSF telemetry packet delivery rate
 
 #define DISCOVERY_TIMEOUT   30000   // 30s sensor discovery time
 
@@ -274,11 +274,12 @@ void SerialHoTT_TLM::handleUARTout()
 
     static uint32_t nextPoll = now + HOTT_POLL_RATE;
     static uint32_t nextCRSFtelemetry = now + CRSF_TELEMETRY_RATE;
+
     static uint32_t discoveryTimer = now + DISCOVERY_TIMEOUT;
     static bool discoveryExpired = false;
 
     static uint8_t hottTLMframe[FRAME_SIZE];
-    static uint8_t size = 0;
+    static uint8_t frameIndex = 0;
 
     static uint8_t nextDevice = FIRST_DEVICE;
 
@@ -294,7 +295,7 @@ void SerialHoTT_TLM::handleUARTout()
         if(!discoveryExpired || devices[nextDevice].devicePresent) {
             poll(devices[nextDevice++].deviceID);
 
-            size = 0;
+            frameIndex = 0;
 
             nextPoll = now + HOTT_POLL_RATE;  
         }
@@ -315,11 +316,12 @@ void SerialHoTT_TLM::handleUARTout()
     
     // if sensor data available read it
     while(Serial.available())
-        hottTLMframe[size++] = Serial.read();
+        hottTLMframe[frameIndex++] = Serial.read();
 
     // if sensor data frame is complete process it
-    if(size == FRAME_SIZE) {
-        size = 0;
+    if(frameIndex == FRAME_SIZE) {
+        frameIndex = 0;
+        //nextPoll = millis() + 60;
 
         if(hottTLMframe[CRC_INDEX] != calcFrameCRC(hottTLMframe))
             return;
@@ -362,9 +364,9 @@ void SerialHoTT_TLM::poll(uint8_t id) {
     hottTLMport.begin(HOTT_BAUD_RATE, SWSERIAL_8N2, -1, GPIO_PIN_RCSIGNAL_RX, false);
     hottTLMport.write(START_OF_CMD_B);
     hottTLMport.write(id);
-    hottTLMport.end();
 
     // switch back to hardware serial on RX pin for incoming sensor data
+    hottTLMport.end();
 #if defined(PLATFORM_ESP8266)
     Serial.begin(HOTT_BAUD_RATE, SERIAL_8N1, SERIAL_FULL, -1, false);
 #elif defined(PLATFORM_ESP32)
