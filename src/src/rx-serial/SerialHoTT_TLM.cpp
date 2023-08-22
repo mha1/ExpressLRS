@@ -6,13 +6,19 @@
 
 extern Telemetry telemetry;
 
-// Variables / constants for HoTT telemetry //
-
 #define HOTT_BAUD_RATE      19200
+
 #define HOTT_POLL_RATE      160     // HoTT bus poll rate [ms]
+#define CRSF_TELEMETRY_RATE 100     // CRSF telemetry packet delivery rate
+
+#define DISCOVERY_TIMEOUT   30000   // 30s sensor discovery time
+
 #define FRAME_SIZE          45      // HoTT telemetry frame size
+#define CRC_INDEX           44
+#define DEVICE_INDEX        1
 
 #define START_OF_CMD_B		0x80  	// start byte of HoTT binary cmd sequence
+
 #define START_FRAME_B   	0x7C  	// HoTT start of frame marker
 #define END_FRAME			0x7D  	// HoTT end of frame marker
 
@@ -30,8 +36,6 @@ extern Telemetry telemetry;
 
 #define SENSOR_ID_VARIO_B 	0x89	// sensor ID binary mode VARIO module
 #define SENSOR_ID_VARIO_T  	0x90	// sensor ID for text mode adressing
-
-enum HoTTDevices { GPS, EAM, GAM, ESC, VARIO, NDEVICES = VARIO+1 } ;
 
 //
 // GAM data frame data structure
@@ -229,25 +233,35 @@ typedef struct HOTT_VARIO_MSG_s {
 } PACKED VarioPacket_t;
 
 typedef struct crsf_sensor_gps_s {
-    int32_t latitude;       // degree / 10,000,000 big endian
-    int32_t longitude;      // degree / 10,000,000 big endian
-    uint16_t groundspeed;   // km/h / 10 big endian
-    uint16_t heading;       // GPS heading, degree/100 big endian
-    uint16_t altitude;      // meters, +1000m big endian
-    uint8_t satellites;     // satellites
+    int32_t latitude;                               // degree / 10,000,000 big endian
+    int32_t longitude;                              // degree / 10,000,000 big endian
+    uint16_t groundspeed;                           // km/h / 10 big endian
+    uint16_t heading;                               // GPS heading, degree/100 big endian
+    uint16_t altitude;                              // meters, +1000m big endian
+    uint8_t satellites;                             // satellites
 } PACKED crsf_sensor_gps_t;
 
-static uint8_t hottTLMframe[FRAME_SIZE];
-static uint8_t size = 0;
+enum HoTTDevices { FIRST_DEVICE = 0, GPS = FIRST_DEVICE, EAM, GAM, ESC, VARIO, NDEVICES = VARIO + 1 } ;
 
-bool devicePresent[NDEVICES] = { false };
+typedef struct hottDevice_s {
+    uint8_t deviceID;
+    bool devicePresent;
+} hottDevice_t;
+
+static hottDevice_t devices[NDEVICES] = {
+    { SENSOR_ID_GPS_B, false },
+    { SENSOR_ID_EAM_B, false },
+    { SENSOR_ID_GAM_B, false },
+    { SENSOR_ID_ESC_B, false },
+    { SENSOR_ID_VARIO_B, false }
+};
 
 // HoTT telemetry packets
-GPSPacket_t gps = {0};
-GeneralAirPacket_t gam = {0};
-AirESCPacket_t esc = {0};
-VarioPacket_t vario = {0};
-ElectricAirPacket_t eam = {0};
+static GPSPacket_t gps = {0};
+static GeneralAirPacket_t gam = {0};
+static AirESCPacket_t esc = {0};
+static VarioPacket_t vario = {0};
+static ElectricAirPacket_t eam = {0};
 
 CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
 CRSF_MK_FRAME_T(crsf_sensor_battery_t) crsfBatt = {0};
@@ -257,57 +271,82 @@ CRSF_MK_FRAME_T(crsf_sensor_gps_t) crsfGPS = {0};
 void SerialHoTT_TLM::handleUARTout()
 {  
     uint32_t now = millis();
+
     static uint32_t nextPoll = now + HOTT_POLL_RATE;
+    static uint32_t nextCRSFtelemetry = now + CRSF_TELEMETRY_RATE;
+    static uint32_t discoveryTimer = now + DISCOVERY_TIMEOUT;
+    static bool discoveryExpired = false;
 
-static bool toggle = false;
+    static uint8_t hottTLMframe[FRAME_SIZE];
+    static uint8_t size = 0;
 
+    static uint8_t nextDevice = FIRST_DEVICE;
+
+    // sensor discovery timer
+    if(!discoveryExpired && now >= discoveryTimer)
+        discoveryExpired = true;
+
+    // device polling scheduler
     if(now >= nextPoll) {
-        nextPoll = now + HOTT_POLL_RATE;    
+        if(nextDevice == NDEVICES)
+            nextDevice = FIRST_DEVICE;
 
-        if(toggle)
-          poll(SENSOR_ID_GPS_B);
+        if(!discoveryExpired || devices[nextDevice].devicePresent) {
+            poll(devices[nextDevice++].deviceID);
+
+            size = 0;
+
+            nextPoll = now + HOTT_POLL_RATE;  
+        }
         else
-         poll(SENSOR_ID_GAM_B);
+          nextDevice++;
+    }
 
-        toggle = !toggle;
-
+    // CRSF telemetry packet scheduler
+    if(now >= nextCRSFtelemetry) {
+        nextCRSFtelemetry = now + CRSF_TELEMETRY_RATE;
+  
         sendCRSFtelemetry();
     }
 
+    // check for incoming sensor data
     if(!Serial.available())
         return;
     
+    // if sensor data available read it
     while(Serial.available())
         hottTLMframe[size++] = Serial.read();
 
+    // if sensor data frame is complete process it
     if(size == FRAME_SIZE) {
         size = 0;
 
-        if(hottTLMframe[44] != calcFrameCRC(hottTLMframe))
+        if(hottTLMframe[CRC_INDEX] != calcFrameCRC(hottTLMframe))
             return;
 
-        switch(hottTLMframe[1]) {
+        switch(hottTLMframe[DEVICE_INDEX]) {
             case SENSOR_ID_GPS_B:
-                devicePresent[GPS] = true;
-                
+                devices[GPS].devicePresent = true;
                 memcpy((void *)&gps, (void *)&hottTLMframe[0], sizeof(gps));
                 break;
 
             case SENSOR_ID_EAM_B:
+                devices[EAM].devicePresent = true;
                 memcpy((void *)&eam, (void *)&hottTLMframe, sizeof(eam));
                 break;
 
             case SENSOR_ID_GAM_B:
-                devicePresent[GAM] = true;
-                
+                devices[GAM].devicePresent = true;
                 memcpy((void *)&gam, (void *)&hottTLMframe, sizeof(gam));
                 break;
 
             case SENSOR_ID_VARIO_B:
+                devices[VARIO].devicePresent = true;
                 memcpy((void *)&vario, (void *)&hottTLMframe, sizeof(vario));
                 break;
 
             case SENSOR_ID_ESC_B:
+                devices[ESC].devicePresent = true;
                 memcpy((void *)&esc, (void *)&hottTLMframe, sizeof(esc));
                 break;
 
@@ -318,15 +357,14 @@ static bool toggle = false;
 }
 
 void SerialHoTT_TLM::poll(uint8_t id) {
+    // switch to Software Serial on RX pin for sending data requests to sensors
     Serial.end();
-
     hottTLMport.begin(HOTT_BAUD_RATE, SWSERIAL_8N2, -1, GPIO_PIN_RCSIGNAL_RX, false);
     hottTLMport.write(START_OF_CMD_B);
     hottTLMport.write(id);
     hottTLMport.end();
 
-    size = 0;
-
+    // switch back to hardware serial on RX pin for incoming sensor data
 #if defined(PLATFORM_ESP8266)
     Serial.begin(HOTT_BAUD_RATE, SERIAL_8N1, SERIAL_FULL, -1, false);
 #elif defined(PLATFORM_ESP32)
@@ -392,85 +430,85 @@ void SerialHoTT_TLM::sendCRSFtelemetry() {
 
 // telemetry data getters
 uint16_t SerialHoTT_TLM::getHoTTvoltage() { 
-    if(devicePresent[EAM]) 
+    if(devices[EAM].devicePresent) 
         return eam.main_voltage;
     else 
-    if(devicePresent[GAM]) 
+    if(devices[GAM].devicePresent) 
         return (gam.InputVoltage);
     else 
-    if(devicePresent[ESC]) 
+    if(devices[ESC].devicePresent) 
         return esc.input_v;
     else
         return 0;
 }
 
 uint16_t SerialHoTT_TLM::getHoTTcurrent() {
-    if(devicePresent[EAM]) 
+    if(devices[EAM].devicePresent) 
         return eam.current;
     else 
-    if(devicePresent[GAM]) 
+    if(devices[GAM].devicePresent) 
         return gam.Current;
     else 
-    if(devicePresent[ESC]) 
+    if(devices[ESC].devicePresent) 
         return esc.current;
     else
         return 0;
 }
 
 uint32_t SerialHoTT_TLM::getHoTTcapacity() { 
-    if(devicePresent[EAM]) 
+    if(devices[EAM].devicePresent) 
         return eam.batt_cap;
     else 
-    if(devicePresent[GAM]) 
+    if(devices[GAM].devicePresent) 
         return (gam.Capacity);
     else 
-    if(devicePresent[ESC]) 
+    if(devices[ESC].devicePresent) 
         return esc.capacity;
     else
         return 0;
 }
 
 int16_t SerialHoTT_TLM::getHoTTaltitude() { 
-    if(devicePresent[GPS]) 
+    if(devices[GPS].devicePresent) 
         return gps.Altitude;
     else 
-    if(devicePresent[VARIO]) 
+    if(devices[VARIO].devicePresent) 
         return vario.altitude;
     else 
-    if(devicePresent[EAM]) 
+    if(devices[EAM].devicePresent) 
         return eam.altitude;
     else
-    if(devicePresent[GAM]) 
+    if(devices[GAM].devicePresent) 
         return gam.Altitude;
     else
         return 0;
 }
 
 int16_t SerialHoTT_TLM::getHoTTvv() {
-    if(devicePresent[GPS]) 
+    if(devices[GPS].devicePresent) 
         return (gps.m_per_sec);
     else 
-    if(devicePresent[VARIO]) 
+    if(devices[VARIO].devicePresent) 
         return (vario.climbrate);
     else 
-    if(devicePresent[EAM]) 
+    if(devices[EAM].devicePresent) 
         return (eam.climbrate);
     else
-    if(devicePresent[GAM]) 
+    if(devices[GAM].devicePresent) 
         return (gam.m_per_sec);
     else
         return 0;
 }
 
 uint8_t SerialHoTT_TLM::getHoTTremaining() {
-    if(!devicePresent[GAM])
+    if(!devices[GAM].devicePresent)
         return 0;
         
     return gam.fuel_scale; 
 }
 
 int32_t SerialHoTT_TLM::getHoTTlatitude() { 
-    if(!devicePresent[GPS])
+    if(!devices[GPS].devicePresent)
         return 0;
 
     uint8_t deg = gps.Lat_DegMin/100;
@@ -486,7 +524,7 @@ int32_t SerialHoTT_TLM::getHoTTlatitude() {
 }
 
 int32_t SerialHoTT_TLM::getHoTTlongitude() { 
-    if(!devicePresent[GPS])
+    if(!devices[GPS].devicePresent)
         return 0;
             
     uint8_t deg = gps.Lon_DegMin/100;
@@ -502,14 +540,14 @@ int32_t SerialHoTT_TLM::getHoTTlongitude() {
 }
 
 uint16_t SerialHoTT_TLM::getHoTTgroundspeed() {
-    if(!devicePresent[GPS])
+    if(!devices[GPS].devicePresent)
         return 0;
             
     return gps.Speed; 
 }
 
 uint16_t SerialHoTT_TLM::getHoTTheading() { 
-    if(!devicePresent[GPS])
+    if(!devices[GPS].devicePresent)
         return 0;
 
     uint16_t heading = gps.Direction * 2;
@@ -521,7 +559,7 @@ uint16_t SerialHoTT_TLM::getHoTTheading() {
 }
 
 uint8_t SerialHoTT_TLM::getHoTTsatellites() {
-    if(!devicePresent[GPS])
+    if(!devices[GPS].devicePresent)
         return 0;
         
     return gps.Satellites;

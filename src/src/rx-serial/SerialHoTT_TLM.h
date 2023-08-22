@@ -32,9 +32,9 @@ private:
     uint16_t getHoTTvoltage();
     uint16_t getHoTTcurrent();
     uint32_t getHoTTcapacity();
-    int16_t getHoTTaltitude();
-    int16_t getHoTTvv();
-    uint8_t getHoTTremaining();
+    int16_t  getHoTTaltitude();
+    int16_t  getHoTTvv();
+    uint8_t  getHoTTremaining();
     int32_t  getHoTTlatitude();
     int32_t  getHoTTlongitude();
     uint16_t getHoTTgroundspeed();
