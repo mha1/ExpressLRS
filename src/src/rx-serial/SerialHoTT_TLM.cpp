@@ -257,11 +257,11 @@ static hottDevice_t devices[NDEVICES] = {
 };
 
 // HoTT telemetry packets
-static GPSPacket_t gps = {0};
-static GeneralAirPacket_t gam = {0};
-static AirESCPacket_t esc = {0};
-static VarioPacket_t vario = {0};
-static ElectricAirPacket_t eam = {0};
+static GPSPacket_t gps;
+static GeneralAirPacket_t gam;
+static AirESCPacket_t esc;
+static VarioPacket_t vario;
+static ElectricAirPacket_t eam;
 
 CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
 CRSF_MK_FRAME_T(crsf_sensor_battery_t) crsfBatt = {0};
@@ -370,7 +370,7 @@ void SerialHoTT_TLM::poll(uint8_t id) {
 #if defined(PLATFORM_ESP8266)
     Serial.begin(HOTT_BAUD_RATE, SERIAL_8N1, SERIAL_FULL, -1, false);
 #elif defined(PLATFORM_ESP32)
-    Serial.begin(HOTT_BAUD_RATE, SERIAL_8N1, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_TX, false);
+    Serial.begin(HOTT_BAUD_RATE, SERIAL_8N1, GPIO_PIN_RCSIGNAL_RX, -1, false);
 #endif
 }
 
