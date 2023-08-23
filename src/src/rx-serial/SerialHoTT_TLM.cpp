@@ -370,6 +370,7 @@ void SerialHoTT_TLM::poll(uint8_t id) {
 #if defined(PLATFORM_ESP8266)
     Serial.begin(HOTT_BAUD_RATE, SERIAL_8N1, SERIAL_FULL, -1, false);
 #elif defined(PLATFORM_ESP32)
+    pinMode(GPIO_PIN_RCSIGNAL_RX, INPUT_PULLUP);
     Serial.begin(HOTT_BAUD_RATE, SERIAL_8N1, GPIO_PIN_RCSIGNAL_RX, -1, false);
 #endif
 }
