@@ -1,10 +1,7 @@
-#if defined(TARGET_RX)
+#if defined(TARGET_RX) && (defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32))
 
 #include "SerialHoTT_TLM.h"
-#include "common.h"
 #include "telemetry.h"
-
-extern Telemetry telemetry;
 
 #define HOTT_BAUD_RATE      19200
 
@@ -267,6 +264,7 @@ CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
 CRSF_MK_FRAME_T(crsf_sensor_battery_t) crsfBatt = {0};
 CRSF_MK_FRAME_T(crsf_sensor_gps_t) crsfGPS = {0};
 
+extern Telemetry telemetry;
 
 void SerialHoTT_TLM::handleUARTout()
 {  
@@ -390,11 +388,13 @@ void SerialHoTT_TLM::sendCRSFtelemetry() {
         case 0: {
             seq++;
 
-            crsfBaro.p.altitude    = htobe16(getHoTTaltitude()*10 + 5000);      // Hott 500 = 0m, ELRS 10000 = 0.0m
-            crsfBaro.p.verticalspd = htobe16(getHoTTvv() - 30000);
+            if(devices[VARIO].devicePresent || devices[GPS].devicePresent) {
+                crsfBaro.p.altitude    = htobe16(getHoTTaltitude()*10 + 5000);      // Hott 500 = 0m, ELRS 10000 = 0.0m
+                crsfBaro.p.verticalspd = htobe16(getHoTTvv() - 30000);
 
-            CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
-            telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
+                CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+                telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
+            }
 
             break;
         }
@@ -402,29 +402,34 @@ void SerialHoTT_TLM::sendCRSFtelemetry() {
         case 1: {
             seq++;
 
-            crsfGPS.p.latitude    = htobe32(getHoTTlatitude());
-            crsfGPS.p.longitude   = htobe32(getHoTTlongitude());
-            crsfGPS.p.groundspeed = htobe16(getHoTTgroundspeed()*10);           // Hott 1 = 1 km/h, ELRS 1 = 0.1km/h 
-            crsfGPS.p.heading     = htobe16(getHoTTheading()*100);
-            crsfGPS.p.altitude    = htobe16(getHoTTaltitude() - 500 + 1000);    // HoTT 0m = 500, CRSF: 0m = 1000
-            crsfGPS.p.satellites  = getHoTTsatellites();
+            if(devices[GPS].devicePresent) {
+                crsfGPS.p.latitude    = htobe32(getHoTTlatitude());
+                crsfGPS.p.longitude   = htobe32(getHoTTlongitude());
+                crsfGPS.p.groundspeed = htobe16(getHoTTgroundspeed()*10);           // Hott 1 = 1 km/h, ELRS 1 = 0.1km/h 
+                crsfGPS.p.heading     = htobe16(getHoTTheading()*100);
+                crsfGPS.p.altitude    = htobe16(getHoTTaltitude() - 500 + 1000);    // HoTT 0m = 500, CRSF: 0m = 1000
+                crsfGPS.p.satellites  = getHoTTsatellites();
 
-            CRSF::SetHeaderAndCrc((uint8_t *)&crsfGPS, CRSF_FRAMETYPE_GPS, CRSF_FRAME_SIZE(sizeof(crsf_sensor_gps_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
-            telemetry.AppendTelemetryPackage((uint8_t *)&crsfGPS);
+                CRSF::SetHeaderAndCrc((uint8_t *)&crsfGPS, CRSF_FRAMETYPE_GPS, CRSF_FRAME_SIZE(sizeof(crsf_sensor_gps_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+                telemetry.AppendTelemetryPackage((uint8_t *)&crsfGPS);
+            }
 
             break;
         }
 
         case 2: {
             seq = 0;
-            
-            crsfBatt.p.voltage   = htobe16(getHoTTvoltage());   
-            crsfBatt.p.current   = htobe16(getHoTTcurrent());   
-            crsfBatt.p.capacity  = htobe24(getHoTTcapacity()*10);               // HoTT: 1 = 10mAh, CRSF: 1 ? 1 = 1mAh
-            crsfBatt.p.remaining = getHoTTremaining();
+            if(devices[GAM].devicePresent || devices[EAM].devicePresent || devices[ESC].devicePresent) {
+                crsfBatt.p.voltage   = htobe16(getHoTTvoltage());   
+                crsfBatt.p.current   = htobe16(getHoTTcurrent());   
+                crsfBatt.p.capacity  = htobe24(getHoTTcapacity()*10);               // HoTT: 1 = 10mAh, CRSF: 1 ? 1 = 1mAh
+                crsfBatt.p.remaining = getHoTTremaining();
 
-            CRSF::SetHeaderAndCrc((uint8_t *)&crsfBatt, CRSF_FRAMETYPE_BATTERY_SENSOR, CRSF_FRAME_SIZE(sizeof(crsf_sensor_battery_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
-            telemetry.AppendTelemetryPackage((uint8_t *)&crsfBatt);
+                telemetry.SetBatterySensorDetected(true);
+
+                CRSF::SetHeaderAndCrc((uint8_t *)&crsfBatt, CRSF_FRAMETYPE_BATTERY_SENSOR, CRSF_FRAME_SIZE(sizeof(crsf_sensor_battery_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+                telemetry.AppendTelemetryPackage((uint8_t *)&crsfBatt);
+            }
 
             break;
         }

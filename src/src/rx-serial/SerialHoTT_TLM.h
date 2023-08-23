@@ -1,8 +1,6 @@
 #include "SerialIO.h"
-#include "FIFO_GENERIC.h"
-#include "telemetry_protocol.h"
-#include <SoftwareSerial.h>
 #include "device.h"
+#include "SoftwareSerial.h"
 
 class SerialHoTT_TLM : public SerialIO {
 public:

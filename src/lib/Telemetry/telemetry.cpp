@@ -54,6 +54,11 @@ bool Telemetry::ShouldSendDeviceFrame()
     return deviceFrame;
 }
 
+void Telemetry::SetBatterySensorDetected(bool on)
+{
+        crsfBatterySensorDetected = on;
+}
+
 void Telemetry::CheckCrsfBatterySensorDetected()
 {
     if (CRSFinBuffer[CRSF_TELEMETRY_TYPE_INDEX] == CRSF_FRAMETYPE_BATTERY_SENSOR)
