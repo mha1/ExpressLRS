@@ -5,8 +5,8 @@
 
 #define HOTT_BAUD_RATE      19200
 
-#define HOTT_POLL_RATE      160     // HoTT bus poll rate [ms]
-#define CRSF_TELEMETRY_RATE 160     // CRSF telemetry packet delivery rate
+#define HOTT_POLL_RATE      70      // HoTT bus poll rate [ms]
+#define CRSF_TELEMETRY_RATE 50      // CRSF telemetry packet delivery rate
 
 #define DISCOVERY_TIMEOUT   30000   // 30s sensor discovery time
 
