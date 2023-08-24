@@ -392,6 +392,8 @@ void SerialHoTT_TLM::sendCRSFtelemetry() {
                 crsfBaro.p.altitude    = htobe16(getHoTTaltitude()*10 + 5000);      // Hott 500 = 0m, ELRS 10000 = 0.0m
                 crsfBaro.p.verticalspd = htobe16(getHoTTvv() - 30000);
 
+                telemetry.SetCrsfBaroSensorDetected(true);
+
                 CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
                 telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
             }
@@ -425,7 +427,7 @@ void SerialHoTT_TLM::sendCRSFtelemetry() {
                 crsfBatt.p.capacity  = htobe24(getHoTTcapacity()*10);               // HoTT: 1 = 10mAh, CRSF: 1 ? 1 = 1mAh
                 crsfBatt.p.remaining = getHoTTremaining();
 
-                telemetry.SetBatterySensorDetected(true);
+                telemetry.SetCrsfBatterySensorDetected(true);
 
                 CRSF::SetHeaderAndCrc((uint8_t *)&crsfBatt, CRSF_FRAMETYPE_BATTERY_SENSOR, CRSF_FRAME_SIZE(sizeof(crsf_sensor_battery_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
                 telemetry.AppendTelemetryPackage((uint8_t *)&crsfBatt);

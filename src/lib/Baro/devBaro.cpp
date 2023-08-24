@@ -111,7 +111,7 @@ static int start()
 
 static int timeout()
 {
-    if (connectionState >= MODE_STATES)
+    if (connectionState >= MODE_STATES || telemetry.GetCrsfBaroSensorDetected())
         return DURATION_NEVER;
 
     switch (BaroReadState)
