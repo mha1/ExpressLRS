@@ -388,7 +388,8 @@ void SerialHoTT_TLM::sendCRSFtelemetry() {
         case 0: {
             seq++;
 
-            if(devices[VARIO].devicePresent || devices[GPS].devicePresent) {
+            if(devices[VARIO].devicePresent || devices[GPS].devicePresent ||
+               devices[EAM].devicePresent || devices[GAM].devicePresent) {
                 crsfBaro.p.altitude    = htobe16(getHoTTaltitude()*10 + 5000);      // Hott 500 = 0m, ELRS 10000 = 0.0m
                 crsfBaro.p.verticalspd = htobe16(getHoTTvv() - 30000);
 
