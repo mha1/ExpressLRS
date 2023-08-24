@@ -1164,7 +1164,7 @@ static void setupSerial()
     bool sbusSerialOutput = false;
 	bool sumdSerialOutput = false;
 
-#if defined(PLATFORM_ESP32) && defined(TARGET_RX)
+#if defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32)
     bool hottTlmSerial = false;
 #endif
 
@@ -1191,7 +1191,7 @@ static void setupSerial()
         sumdSerialOutput = true;
         serialBaud = 115200;
     }
-#if defined(PLATFORM_ESP32) && defined(TARGET_RX)
+#if defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32)
 	else if (config.GetSerialProtocol() == PROTOCOL_HOTT_TLM)
     {
         hottTlmSerial = true;
