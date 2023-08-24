@@ -20,6 +20,8 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
+#if defined(PLATFORM_ESP32) && defined(TARGET_RX)
+
 #include "SoftwareSerial.h"
 #include <Arduino.h>
 
@@ -619,3 +621,4 @@ template bool IRAM_ATTR circular_queue<uint32_t, UARTBase*>::push(uint32_t&&);
 template bool IRAM_ATTR circular_queue<uint32_t, UARTBase*>::push(const uint32_t&);
 #endif // __GNUC__ < 12
 
+#endif

@@ -21,7 +21,6 @@
 #include "rx-serial/SerialSBUS.h"
 #include "rx-serial/SerialSUMD.h"
 #include "rx-serial/SerialAirPort.h"
-#include "rx-serial/SerialHoTT_TLM.h"
 
 #include "rx-serial/devSerialIO.h"
 #include "devLED.h"
@@ -109,6 +108,8 @@ MSP2CROSSFIRE msp2crsf;
 #endif
 
 #if defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32)
+#include "rx-serial/SerialHoTT_TLM.h"
+
 unsigned long rebootTime = 0;
 extern bool webserverPreventAutoStart;
 bool pwmSerialDefined = false;
@@ -1162,7 +1163,10 @@ static void setupSerial()
 {
     bool sbusSerialOutput = false;
 	bool sumdSerialOutput = false;
+
+#if defined(PLATFORM_ESP32) && defined(TARGET_RX)
     bool hottTlmSerial = false;
+#endif
 
     if (OPT_CRSF_RCVR_NO_SERIAL)
     {
@@ -1187,11 +1191,13 @@ static void setupSerial()
         sumdSerialOutput = true;
         serialBaud = 115200;
     }
+#if defined(PLATFORM_ESP32) && defined(TARGET_RX)
 	else if (config.GetSerialProtocol() == PROTOCOL_HOTT_TLM)
     {
         hottTlmSerial = true;
         serialBaud = 19200;
     }    
+#endif
     bool invert = config.GetSerialProtocol() == PROTOCOL_SBUS || config.GetSerialProtocol() == PROTOCOL_INVERTED_CRSF || config.GetSerialProtocol() == PROTOCOL_DJI_RS_PRO;
 
 #ifdef PLATFORM_STM32
@@ -1266,10 +1272,12 @@ static void setupSerial()
     {
         serialIO = new SerialSUMD(SERIAL_PROTOCOL_TX, SERIAL_PROTOCOL_RX);
     }
+    #if defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32)
     else if (hottTlmSerial)
     {
         serialIO = new SerialHoTT_TLM(SERIAL_PROTOCOL_TX, SERIAL_PROTOCOL_RX);
     }
+    #endif
     else
     {
         serialIO = new SerialCRSF(SERIAL_PROTOCOL_TX, SERIAL_PROTOCOL_RX);

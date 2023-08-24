@@ -18,6 +18,7 @@ License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
+#if defined(PLATFORM_ESP32) && defined(TARGET_RX)
 
 #ifndef __SoftwareSerial_h
 #define __SoftwareSerial_h
@@ -446,4 +447,6 @@ extern template bool circular_queue<uint32_t, EspSoftwareSerial::UARTBase*>::pus
 #endif // __GNUC__ < 12
 
 #endif // __SoftwareSerial_h
+
+#endif
 
