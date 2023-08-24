@@ -20,7 +20,7 @@ Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
 
 */
 
-#if defined(PLATFORM_ESP32) && defined(TARGET_RX)
+#if defined(TARGET_RX) && (defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32))
 
 #include "SoftwareSerial.h"
 #include <Arduino.h>
