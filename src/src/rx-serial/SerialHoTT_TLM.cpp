@@ -6,9 +6,12 @@
 #define HOTT_BAUD_RATE      19200
 
 #define HOTT_POLL_RATE      70      // HoTT bus poll rate [ms]
+#define HOTT_POLL_BUY_TIME  10      // add wait time as long as data frame is not complete
+#define HOTT_POLL_NOW       0       // start polling next device after frame received
+
 #define CRSF_TELEMETRY_RATE 50      // CRSF telemetry packet delivery rate
 
-#define DISCOVERY_TIMEOUT   30000   // 30s sensor discovery time
+#define DISCOVERY_TIMEOUT   30000   // 30s device discovery time
 
 #define FRAME_SIZE          45      // HoTT telemetry frame size
 #define CRC_INDEX           44
@@ -19,20 +22,20 @@
 #define START_FRAME_B   	0x7C  	// HoTT start of frame marker
 #define END_FRAME			0x7D  	// HoTT end of frame marker
 
-#define SENSOR_ID_GPS_B 	0x8A  	// sensor ID binary mode GPS module
-#define SENSOR_ID_GPS_T		0xA0  	// sensor ID for text mode adressing
+#define SENSOR_ID_GPS_B 	0x8A  	// device ID binary mode GPS module
+#define SENSOR_ID_GPS_T		0xA0  	// device ID for text mode adressing
 
-#define SENSOR_ID_GAM_B	 	0x8D  	// our telemetry ID for fake GAM module
-#define SENSOR_ID_GAM_T		0xD0  	// sensor ID for text mode adressing
+#define SENSOR_ID_GAM_B	 	0x8D  	// device ID binary mode GAM module
+#define SENSOR_ID_GAM_T		0xD0  	// device ID for text mode adressing
 
-#define SENSOR_ID_EAM_B  	0x8E	// sensor ID binary mode EAM module
-#define SENSOR_ID_EAM_T  	0xE0	// sensor ID for text mode adressing
+#define SENSOR_ID_EAM_B  	0x8E	// device ID binary mode EAM module
+#define SENSOR_ID_EAM_T  	0xE0	// device ID for text mode adressing
 
-#define SENSOR_ID_ESC_B 	0x8C	// sensor ID binary mode ESC module
-#define SENSOR_ID_ESC_T  	0xC0	// sensor ID for text mode adressing
+#define SENSOR_ID_ESC_B 	0x8C	// device ID binary mode ESC module
+#define SENSOR_ID_ESC_T  	0xC0	// device ID for text mode adressing
 
-#define SENSOR_ID_VARIO_B 	0x89	// sensor ID binary mode VARIO module
-#define SENSOR_ID_VARIO_T  	0x90	// sensor ID for text mode adressing
+#define SENSOR_ID_VARIO_B 	0x89	// device ID binary mode VARIO module
+#define SENSOR_ID_VARIO_T  	0x90	// device ID for text mode adressing
 
 //
 // GAM data frame data structure
@@ -150,7 +153,7 @@ typedef struct {
     uint16_t batt2_voltage	= 0;                    // 22 battery 2 voltage lower value in 100mv steps, 50=5V. optionally cell8_H value. 0.02V steps
     uint8_t temp1 			= 20;                   // 24 Temperature sensor 1. 20=0�, 46=26� - offset of 20.
     uint8_t temp2 			= 20;                   // 25 temperature sensor 2
-    uint16_t altitude 		= 500;                  // 26 Attitude lower value. unit: meters. Value of 500 = 0m
+    uint16_t altitude 		= 500;                  // 26 Altitude lower value. unit: meters. Value of 500 = 0m
     uint16_t current		= 0;                    // 28 Current in 0.1 steps
     uint16_t main_voltage	= 0;                    // 30 Main power voltage (drive) in 0.1V steps
     uint16_t batt_cap		= 0;                    // 32 used battery capacity in 10mAh steps
@@ -238,14 +241,14 @@ typedef struct crsf_sensor_gps_s {
     uint8_t satellites;                             // satellites
 } PACKED crsf_sensor_gps_t;
 
-enum HoTTDevices { FIRST_DEVICE = 0, GPS = FIRST_DEVICE, EAM, GAM, ESC, VARIO, NDEVICES = VARIO + 1 } ;
+enum HoTTDevices { FIRST_DEVICE = 0, GPS = FIRST_DEVICE, EAM, GAM, ESC, VARIO, LAST_DEVICE } ;
 
 typedef struct hottDevice_s {
     uint8_t deviceID;
     bool devicePresent;
 } hottDevice_t;
 
-static hottDevice_t devices[NDEVICES] = {
+static hottDevice_t devices[LAST_DEVICE] = {
     { SENSOR_ID_GPS_B, false },
     { SENSOR_ID_EAM_B, false },
     { SENSOR_ID_GAM_B, false },
@@ -281,24 +284,36 @@ void SerialHoTT_TLM::handleUARTout()
 
     static uint8_t nextDevice = FIRST_DEVICE;
 
-    // sensor discovery timer
+    // device discovery timer
     if(!discoveryExpired && now >= discoveryTimer)
         discoveryExpired = true;
 
     // device polling scheduler
-    if(now >= nextPoll) {
-        if(nextDevice == NDEVICES)
-            nextDevice = FIRST_DEVICE;
+    if(now >= nextPoll) {          
+        nextPoll = now + HOTT_POLL_RATE; 
 
-        if(!discoveryExpired || devices[nextDevice].devicePresent) {
+        frameIndex = 0;
+
+        // start up in device discovery mode, the after timeout regular operation 
+        if(!discoveryExpired) {                
+            if(nextDevice == LAST_DEVICE)
+                nextDevice = FIRST_DEVICE;
+
             poll(devices[nextDevice++].deviceID);
+        } else {
+            for(uint i = 0; i < LAST_DEVICE; i++) {
+                if(nextDevice == LAST_DEVICE)
+                    nextDevice = FIRST_DEVICE; 
+                
+                if(devices[nextDevice].devicePresent) {
+                    poll(devices[nextDevice++].deviceID);
 
-            frameIndex = 0;
+                    break;
+                }
 
-            nextPoll = now + HOTT_POLL_RATE;  
+                nextDevice++;
+            }
         }
-        else
-          nextDevice++;
     }
 
     // CRSF telemetry packet scheduler
@@ -308,18 +323,23 @@ void SerialHoTT_TLM::handleUARTout()
         sendCRSFtelemetry();
     }
 
-    // check for incoming sensor data
+    // check for incoming device data
     if(!Serial.available())
         return;
     
-    // if sensor data available read it
+    // if device data is available read it
     while(Serial.available())
         hottTLMframe[frameIndex++] = Serial.read();
+    
+    // frame not complete yet, buy more time before polling next device
+    nextPoll += HOTT_POLL_BUY_TIME;
 
-    // if sensor data frame is complete process it
+    // if device data frame is complete process it
     if(frameIndex == FRAME_SIZE) {
         frameIndex = 0;
-        //nextPoll = millis() + 60;
+
+        // start polling next device 
+        nextPoll = HOTT_POLL_NOW;
 
         if(hottTLMframe[CRC_INDEX] != calcFrameCRC(hottTLMframe))
             return;
@@ -357,13 +377,13 @@ void SerialHoTT_TLM::handleUARTout()
 }
 
 void SerialHoTT_TLM::poll(uint8_t id) {
-    // switch to Software Serial on RX pin for sending data requests to sensors
+    // switch to Software Serial on RX pin for sending data requests to devices
     Serial.end();
     hottTLMport.begin(HOTT_BAUD_RATE, SWSERIAL_8N2, -1, GPIO_PIN_RCSIGNAL_RX, false);
     hottTLMport.write(START_OF_CMD_B);
     hottTLMport.write(id);
 
-    // switch back to hardware serial on RX pin for incoming sensor data
+    // switch back to hardware serial on RX pin for incoming device data
     hottTLMport.end();
 #if defined(PLATFORM_ESP8266)
     Serial.begin(HOTT_BAUD_RATE, SERIAL_8N1, SERIAL_FULL, -1, false);
@@ -439,7 +459,7 @@ void SerialHoTT_TLM::sendCRSFtelemetry() {
     }
 }
 
-// telemetry data getters
+// HoTT telemetry data getters
 uint16_t SerialHoTT_TLM::getHoTTvoltage() { 
     if(devices[EAM].devicePresent) 
         return eam.main_voltage;
