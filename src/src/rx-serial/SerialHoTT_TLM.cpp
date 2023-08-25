@@ -5,9 +5,8 @@
 
 #define HOTT_BAUD_RATE      19200
 
-#define HOTT_POLL_RATE      70      // HoTT bus poll rate [ms]
+#define HOTT_POLL_RATE      70      // default HoTT bus poll rate [ms]
 #define HOTT_POLL_BUY_TIME  10      // add wait time as long as data frame is not complete
-#define HOTT_POLL_NOW       0       // start polling next device after frame received
 
 #define CRSF_TELEMETRY_RATE 50      // CRSF telemetry packet delivery rate
 
@@ -339,11 +338,13 @@ void SerialHoTT_TLM::handleUARTout()
         frameIndex = 0;
 
         // start polling next device 
-        nextPoll = HOTT_POLL_NOW;
+        nextPoll = now;
 
+        // discard frame id CRC is bad
         if(hottTLMframe[CRC_INDEX] != calcFrameCRC(hottTLMframe))
             return;
 
+        // store received frame
         switch(hottTLMframe[DEVICE_INDEX]) {
             case SENSOR_ID_GPS_B:
                 devices[GPS].devicePresent = true;
