@@ -2,6 +2,9 @@
 
 #include "SerialHoTT_TLM.h"
 #include "telemetry.h"
+#include "FIFO_GENERIC.h"
+
+#define HOTT_MAX_BUF_LEN    64      // max buffer size for serial in data
 
 #define HOTT_POLL_RATE      150     // default HoTT bus poll rate [ms]
 #define HOTT_LEAD_OUT       10      // minimum gap between end of payload to next poll
@@ -14,23 +17,18 @@
 #define DEVICE_INDEX        1       // index of device ID    
 #define CRC_INDEX           44      // index of CRC  
 
-#define START_OF_CMD_B		0x80  	// start byte of HoTT binary cmd sequence
-
 #define START_FRAME_B   	0x7C  	// HoTT start of frame marker
 #define END_FRAME			0x7D  	// HoTT end of frame marker
 
+#define START_OF_CMD_B		0x80  	// start byte of HoTT binary cmd sequence
 #define SENSOR_ID_GPS_B 	0x8A  	// device ID binary mode GPS module
 #define SENSOR_ID_GPS_T		0xA0  	// device ID for text mode adressing
-
 #define SENSOR_ID_GAM_B	 	0x8D  	// device ID binary mode GAM module
 #define SENSOR_ID_GAM_T		0xD0  	// device ID for text mode adressing
-
 #define SENSOR_ID_EAM_B  	0x8E	// device ID binary mode EAM module
 #define SENSOR_ID_EAM_T  	0xE0	// device ID for text mode adressing
-
 #define SENSOR_ID_ESC_B 	0x8C	// device ID binary mode ESC module
 #define SENSOR_ID_ESC_T  	0xC0	// device ID for text mode adressing
-
 #define SENSOR_ID_VARIO_B 	0x89	// device ID binary mode VARIO module
 #define SENSOR_ID_VARIO_T  	0x90	// device ID for text mode adressing
 
@@ -234,12 +232,12 @@ typedef struct hottBusframe_s {
     uint8_t payload[FRAME_SIZE]; 
 } PACKED hottBusframe_t;
 
-enum HoTTDevices { FIRST_DEVICE = 0, GPS = FIRST_DEVICE, EAM, GAM, ESC, VARIO, LAST_DEVICE } ;
-
 typedef struct hottDevice_s {
     uint8_t deviceID;
     bool present;
 } hottDevice_t;
+
+enum HoTTDevices { FIRST_DEVICE = 0, GPS = FIRST_DEVICE, EAM, GAM, ESC, VARIO, LAST_DEVICE } ;
 
 static hottDevice_t device[LAST_DEVICE] = {
     { SENSOR_ID_GPS_B, false },
@@ -269,14 +267,14 @@ CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
 CRSF_MK_FRAME_T(crsf_sensor_battery_t) crsfBatt = {0};
 CRSF_MK_FRAME_T(crsf_sensor_gps_t) crsfGPS = {0};
 
-FIFO_GENERIC<64> hottInputBuffer;
-
-extern Telemetry telemetry;
+FIFO_GENERIC<HOTT_MAX_BUF_LEN> hottInputBuffer;
 
 static hottBusframe_t hottBusFrame;
 
-static bool discoveryExpired = false;
+static bool discoveryMode = true;
 static uint8_t nextDevice = FIRST_DEVICE;
+
+extern Telemetry telemetry;
 
 
 int SerialHoTT_TLM::getMaxSerialReadSize()
@@ -286,7 +284,7 @@ int SerialHoTT_TLM::getMaxSerialReadSize()
 
 void SerialHoTT_TLM::processBytes(uint8_t *bytes, u_int16_t size)
 {
-        hottInputBuffer.pushBytes(bytes, size);
+    hottInputBuffer.pushBytes(bytes, size);
 }
 
 void SerialHoTT_TLM::handleUARTout()
@@ -298,8 +296,8 @@ void SerialHoTT_TLM::handleUARTout()
     static uint32_t discoveryTimer = now + DISCOVERY_TIMEOUT;
 
     // device discovery timer
-    if(!discoveryExpired && now >= discoveryTimer)
-        discoveryExpired = true;
+    if(discoveryMode && now >= discoveryTimer)
+        discoveryMode = false;
 
     // device polling scheduler
     if(now >= nextPoll) {          
@@ -319,11 +317,11 @@ void SerialHoTT_TLM::handleUARTout()
     uint8_t size = hottInputBuffer.size(); 
 
     if(size == sizeof(hottBusFrame)) {
-        //fetch serial in data
-        hottInputBuffer.popBytes((uint8_t *)&hottBusFrame, size);
-
-        // start polling next device 
+        // prepare polling next device 
         nextPoll = now + HOTT_LEAD_OUT;
+
+        //fetch received serial data
+        hottInputBuffer.popBytes((uint8_t *)&hottBusFrame, size);
 
         // process received frame if CRC is ok
         if(hottBusFrame.payload[CRC_INDEX] == calcFrameCRC((uint8_t *)&hottBusFrame.payload))
@@ -335,8 +333,8 @@ void SerialHoTT_TLM::pollNextDevice() {
     // clear serial in buffer    
     hottInputBuffer.flush();
 
-    // work out next device to be polled in discovery mode
-    if(!discoveryExpired) {                
+    // work out next device to be polled in discovery mode (just poll all devices)
+    if(discoveryMode) {                
         if(nextDevice == LAST_DEVICE)
             nextDevice = FIRST_DEVICE;
 
@@ -346,7 +344,7 @@ void SerialHoTT_TLM::pollNextDevice() {
         return;
     }
 
-    // work out next device to be polled in normal op mode
+    // work out next device to be polled in normal op mode (only poll discovered ones)
     for(uint i = 0; i < LAST_DEVICE; i++) {
         if(nextDevice == LAST_DEVICE)
             nextDevice = FIRST_DEVICE; 
@@ -363,31 +361,33 @@ void SerialHoTT_TLM::pollNextDevice() {
 }
 
 void SerialHoTT_TLM::processFrame() {
+    void *frameData = (void *)&hottBusFrame.payload;
+
     // store received frame
     switch(hottBusFrame.payload[DEVICE_INDEX]) {
         case SENSOR_ID_GPS_B:
             device[GPS].present = true;
-            memcpy((void *)&gps, (void *)&hottBusFrame.payload, sizeof(gps));
+            memcpy((void *)&gps, frameData, sizeof(gps));
             break;
 
         case SENSOR_ID_EAM_B:
             device[EAM].present = true;
-            memcpy((void *)&eam, (void *)&hottBusFrame.payload, sizeof(eam));
+            memcpy((void *)&eam, frameData, sizeof(eam));
             break;
 
         case SENSOR_ID_GAM_B:
             device[GAM].present = true;
-            memcpy((void *)&gam, (void *)&hottBusFrame.payload, sizeof(gam));
+            memcpy((void *)&gam, frameData, sizeof(gam));
             break;
 
         case SENSOR_ID_VARIO_B:
             device[VARIO].present = true;
-            memcpy((void *)&vario, (void *)&hottBusFrame.payload, sizeof(vario));
+            memcpy((void *)&vario, frameData, sizeof(vario));
             break;
 
         case SENSOR_ID_ESC_B:
             device[ESC].present = true;
-            memcpy((void *)&esc, (void *)&hottBusFrame.payload, sizeof(esc));
+            memcpy((void *)&esc, frameData, sizeof(esc));
             break;
     }
 }
@@ -401,61 +401,59 @@ uint8_t SerialHoTT_TLM::calcFrameCRC(uint8_t *buf) {
 }
 
 void SerialHoTT_TLM::sendCRSFtelemetry() {
-    static uint8_t seq = 0;
-
-    switch(seq) {
-        case 0: {
-            seq++;
-
-            if(device[VARIO].present || device[GPS].present ||
-               device[EAM].present || device[GAM].present) {
-                crsfBaro.p.altitude    = htobe16(getHoTTaltitude()*10 + 5000);      // Hott 500 = 0m, ELRS 10000 = 0.0m
-                crsfBaro.p.verticalspd = htobe16(getHoTTvv() - 30000);
-
-                telemetry.SetCrsfBaroSensorDetected(true);
-
-                CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
-                telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
-            }
-
-            break;
-        }
-
-        case 1: {
-            seq++;
-
-            if(device[GPS].present) {
-                crsfGPS.p.latitude    = htobe32(getHoTTlatitude());
-                crsfGPS.p.longitude   = htobe32(getHoTTlongitude());
-                crsfGPS.p.groundspeed = htobe16(getHoTTgroundspeed()*10);           // Hott 1 = 1 km/h, ELRS 1 = 0.1km/h 
-                crsfGPS.p.heading     = htobe16(getHoTTheading()*100);
-                crsfGPS.p.altitude    = htobe16(getHoTTaltitude() - 500 + 1000);    // HoTT 0m = 500, CRSF: 0m = 1000
-                crsfGPS.p.satellites  = getHoTTsatellites();
-
-                CRSF::SetHeaderAndCrc((uint8_t *)&crsfGPS, CRSF_FRAMETYPE_GPS, CRSF_FRAME_SIZE(sizeof(crsf_sensor_gps_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
-                telemetry.AppendTelemetryPackage((uint8_t *)&crsfGPS);
-            }
-
-            break;
-        }
-
-        case 2: {
-            seq = 0;
-            if(device[GAM].present || device[EAM].present || device[ESC].present) {
-                crsfBatt.p.voltage   = htobe16(getHoTTvoltage());   
-                crsfBatt.p.current   = htobe16(getHoTTcurrent());   
-                crsfBatt.p.capacity  = htobe24(getHoTTcapacity()*10);               // HoTT: 1 = 10mAh, CRSF: 1 ? 1 = 1mAh
-                crsfBatt.p.remaining = getHoTTremaining();
-
-                telemetry.SetCrsfBatterySensorDetected(true);
-
-                CRSF::SetHeaderAndCrc((uint8_t *)&crsfBatt, CRSF_FRAMETYPE_BATTERY_SENSOR, CRSF_FRAME_SIZE(sizeof(crsf_sensor_battery_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
-                telemetry.AppendTelemetryPackage((uint8_t *)&crsfBatt);
-            }
-
-            break;
-        }
+    // HoTT combined GPS/Vario
+    if(device[GPS].present) {
+        sendCRSFgps();
+        sendCRSFvario();
     }
+
+    // HoTT stand alone Vario
+    if(device[VARIO].present && !device[GPS].present)
+        sendCRSFvario();
+
+    // HoTT GAM, EAM, ESC
+    if(device[GAM].present || device[EAM].present || device[ESC].present) {
+        sendCRSFbattery();
+
+        // HoTT GAM and EAM
+        if((!device[GPS].present && !device[VARIO].present) && (device[GAM].present || device[EAM].present))
+            sendCRSFvario();
+    }
+}
+
+void SerialHoTT_TLM::sendCRSFvario() {
+    crsfBaro.p.altitude    = htobe16(getHoTTaltitude()*10 + 5000);      // Hott 500 = 0m, ELRS 10000 = 0.0m
+    crsfBaro.p.verticalspd = htobe16(getHoTTvv() - 30000);
+
+    telemetry.SetCrsfBaroSensorDetected(true);
+
+    CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+    telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
+}
+
+void SerialHoTT_TLM::sendCRSFgps() {
+    crsfGPS.p.latitude    = htobe32(getHoTTlatitude());
+    crsfGPS.p.longitude   = htobe32(getHoTTlongitude());
+    crsfGPS.p.groundspeed = htobe16(getHoTTgroundspeed()*10);           // Hott 1 = 1 km/h, ELRS 1 = 0.1km/h 
+    crsfGPS.p.heading     = htobe16(getHoTTheading()*100);
+    crsfGPS.p.altitude    = htobe16(getHoTTaltitude() - 500 + 1000);    // HoTT 0m = 500, CRSF: 0m = 1000
+    crsfGPS.p.satellites  = getHoTTsatellites();
+
+    CRSF::SetHeaderAndCrc((uint8_t *)&crsfGPS, CRSF_FRAMETYPE_GPS, CRSF_FRAME_SIZE(sizeof(crsf_sensor_gps_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+    
+    telemetry.AppendTelemetryPackage((uint8_t *)&crsfGPS);
+}
+
+void SerialHoTT_TLM::sendCRSFbattery() {
+    crsfBatt.p.voltage   = htobe16(getHoTTvoltage());   
+    crsfBatt.p.current   = htobe16(getHoTTcurrent());   
+    crsfBatt.p.capacity  = htobe24(getHoTTcapacity()*10);               // HoTT: 1 = 10mAh, CRSF: 1 ? 1 = 1mAh
+    crsfBatt.p.remaining = getHoTTremaining();
+
+    telemetry.SetCrsfBatterySensorDetected(true);
+
+    CRSF::SetHeaderAndCrc((uint8_t *)&crsfBatt, CRSF_FRAMETYPE_BATTERY_SENSOR, CRSF_FRAME_SIZE(sizeof(crsf_sensor_battery_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+    telemetry.AppendTelemetryPackage((uint8_t *)&crsfBatt);
 }
 
 // HoTT telemetry data getters
