@@ -3,7 +3,7 @@
 #include "SerialIO.h"
 #include "device.h"
 
-#define HOTT_TLM_ESP32_NO_DIODE
+//#define HOTT_TLM_ESP32_NO_DIODE
 
 class SerialHoTT_TLM : public SerialIO {
 public:

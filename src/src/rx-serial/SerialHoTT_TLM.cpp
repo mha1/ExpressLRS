@@ -7,7 +7,7 @@
 #define HOTT_MAX_BUF_LEN    64      // max buffer size for serial in data
 
 #define HOTT_POLL_RATE      150     // default HoTT bus poll rate [ms]
-#define HOTT_LEAD_OUT       10      // minimum gap between end of payload to next poll
+#define HOTT_LEAD_OUT       20      // minimum gap between end of payload to next poll
 #define CRSF_TELEMETRY_RATE 50      // CRSF telemetry packet delivery rate
 
 #define DISCOVERY_TIMEOUT   30000   // 30s device discovery time
