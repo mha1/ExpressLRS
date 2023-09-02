@@ -20,6 +20,7 @@
 #include "rx-serial/SerialCRSF.h"
 #include "rx-serial/SerialSBUS.h"
 #include "rx-serial/SerialSUMD.h"
+#include "rx-serial/SerialHoTT_TLM.h"
 #include "rx-serial/SerialAirPort.h"
 
 #include "rx-serial/devSerialIO.h"
@@ -1264,14 +1265,19 @@ static void setupSerial()
     Serial.begin(serialBaud, config, mode, -1, invert);
 #elif defined(PLATFORM_ESP32)
     uint32_t config = SERIAL_8N1;
-    
+    uint8_t rxPin = GPIO_PIN_RCSIGNAL_RX;
+
     if(sbusSerialOutput) 
         config = SERIAL_8E2;
     else
-    if(hottTlmSerial)
+    if(hottTlmSerial) {
         config = SERIAL_8N2;
-
-    Serial.begin(serialBaud, config, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_TX, invert);
+#if defined(HOTT_TLM_ESP32_NO_DIODE)
+        rxPin = GPIO_PIN_RCSIGNAL_TX;
+#endif
+    }
+    
+    Serial.begin(serialBaud, config, rxPin, GPIO_PIN_RCSIGNAL_TX, invert);
 #endif
 
     if (firmwareOptions.is_airport)

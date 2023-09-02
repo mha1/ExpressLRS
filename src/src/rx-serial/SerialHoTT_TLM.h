@@ -1,5 +1,9 @@
+#pragma once
+
 #include "SerialIO.h"
 #include "device.h"
+
+#define HOTT_TLM_ESP32_NO_DIODE
 
 class SerialHoTT_TLM : public SerialIO {
 public:
@@ -21,6 +25,7 @@ private:
     void processByte(uint8_t byte) override { /* not supported */ };
 
     void pollNextDevice();
+    void pollDevice(uint8_t id);
     void processFrame();
     uint8_t calcFrameCRC(uint8_t *buf);
     

@@ -228,7 +228,9 @@ typedef struct HOTT_VARIO_MSG_s {
 } PACKED VarioPacket_t;
 
 typedef struct hottBusframe_s {
+#if !(defined(PLATFORM_ESP32) && defined(HOTT_TLM_ESP32_NO_DIODE))
     uint8_t cmdMirror[CMD_LEN];
+#endif
     uint8_t payload[FRAME_SIZE]; 
 } PACKED hottBusframe_t;
 
@@ -276,6 +278,9 @@ static uint8_t nextDevice = FIRST_DEVICE;
 
 extern Telemetry telemetry;
 
+void duplex_set_TX();
+void duplex_set_RX();
+
 
 int SerialHoTT_TLM::getMaxSerialReadSize()
 {
@@ -316,7 +321,7 @@ void SerialHoTT_TLM::handleUARTout()
 
     uint8_t size = hottInputBuffer.size(); 
 
-    if(size == sizeof(hottBusFrame)) {
+    if(size >= sizeof(hottBusFrame)) {
         // prepare polling next device 
         nextPoll = now + HOTT_LEAD_OUT;
 
@@ -338,8 +343,7 @@ void SerialHoTT_TLM::pollNextDevice() {
         if(nextDevice == LAST_DEVICE)
             nextDevice = FIRST_DEVICE;
 
-        _outputPort->write(START_OF_CMD_B);
-        _outputPort->write(device[nextDevice++].deviceID);
+        pollDevice(device[nextDevice++].deviceID);
 
         return;
     }
@@ -350,14 +354,25 @@ void SerialHoTT_TLM::pollNextDevice() {
             nextDevice = FIRST_DEVICE; 
         
         if(device[nextDevice].present) {
-            _outputPort->write(START_OF_CMD_B);
-            _outputPort->write(device[nextDevice++].deviceID); 
+            pollDevice(device[nextDevice++].deviceID);
 
             break;
         }
 
         nextDevice++;
     }
+}
+
+void SerialHoTT_TLM::pollDevice(uint8_t id) {
+    // ESP32 only with no diode defined: switch to transmitting data
+    duplex_set_TX();
+
+    // send data request to device
+    _outputPort->write(START_OF_CMD_B);
+    _outputPort->write(id);
+
+    // ESP32 only with no diode defined: switch to transmitting data
+    duplex_set_RX();
 }
 
 void SerialHoTT_TLM::processFrame() {
@@ -604,6 +619,31 @@ uint32_t SerialHoTT_TLM::htobe24(uint32_t val) {
     ptrByte[2]  = swp;
 
     return val;
+#endif
+}
+
+void ICACHE_RAM_ATTR duplex_set_RX() {
+#if defined(PLATFORM_ESP32) && defined(HOTT_TLM_ESP32_NO_DIODE)
+    // wait for 2 bytes@19200 transmission to finish
+    delayMicroseconds(1100);
+
+    // switch to receive mode
+    ESP_ERROR_CHECK(gpio_set_direction((gpio_num_t)GPIO_PIN_RCSIGNAL_TX, GPIO_MODE_INPUT));
+    gpio_matrix_in((gpio_num_t)GPIO_PIN_RCSIGNAL_TX, U0RXD_IN_IDX, false);
+    gpio_pullup_en((gpio_num_t)GPIO_PIN_RCSIGNAL_TX);
+    gpio_pulldown_dis((gpio_num_t)GPIO_PIN_RCSIGNAL_TX);
+#endif
+}
+
+void ICACHE_RAM_ATTR duplex_set_TX() {
+#if defined(PLATFORM_ESP32) && defined(HOTT_TLM_ESP32_NO_DIODE)
+    // switch to transmit mode
+    ESP_ERROR_CHECK(gpio_set_pull_mode((gpio_num_t)GPIO_PIN_RCSIGNAL_TX, GPIO_FLOATING));
+    ESP_ERROR_CHECK(gpio_set_level((gpio_num_t)GPIO_PIN_RCSIGNAL_TX, 1));
+    ESP_ERROR_CHECK(gpio_set_direction((gpio_num_t)GPIO_PIN_RCSIGNAL_TX, GPIO_MODE_OUTPUT));
+    constexpr uint8_t MATRIX_DETACH_IN_HIGH = 0x38; // routes 1 to matrix slot
+    gpio_matrix_in(MATRIX_DETACH_IN_HIGH, U0RXD_IN_IDX, false); // Disconnect RX from all pads
+    gpio_matrix_out((gpio_num_t)GPIO_PIN_RCSIGNAL_TX, U0TXD_OUT_IDX, false, false);
 #endif
 }
 
