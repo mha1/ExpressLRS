@@ -312,13 +312,6 @@ void SerialHoTT_TLM::handleUARTout()
         pollNextDevice();
     }
 
-    // CRSF telemetry packet scheduler
-    if(now >= nextCRSFtelemetry) {
-        nextCRSFtelemetry = now + CRSF_TELEMETRY_RATE;
-  
-        sendCRSFtelemetry();
-    }
-
     uint8_t size = hottInputBuffer.size(); 
 
     if(size >= sizeof(hottBusFrame)) {
@@ -331,6 +324,13 @@ void SerialHoTT_TLM::handleUARTout()
         // process received frame if CRC is ok
         if(hottBusFrame.payload[CRC_INDEX] == calcFrameCRC((uint8_t *)&hottBusFrame.payload))
             processFrame();
+    }
+
+    // CRSF telemetry packet scheduler
+    if(now >= nextCRSFtelemetry) {
+        nextCRSFtelemetry = now + CRSF_TELEMETRY_RATE;
+  
+        sendCRSFtelemetry();
     }
 }
 
@@ -416,21 +416,20 @@ uint8_t SerialHoTT_TLM::calcFrameCRC(uint8_t *buf) {
 }
 
 void SerialHoTT_TLM::sendCRSFtelemetry() {
-    // HoTT combined GPS/Vario
+    // HoTT combined GPS/Vario -> send GPS and vario packet
     if(device[GPS].present) {
         sendCRSFgps();
         sendCRSFvario();
-    }
+    } else
+        // HoTT stand alone Vario and no GPS/Vario -> just send vario packet
+        if(device[VARIO].present)
+            sendCRSFvario();
 
-    // HoTT stand alone Vario
-    if(device[VARIO].present && !device[GPS].present)
-        sendCRSFvario();
-
-    // HoTT GAM, EAM, ESC
+    // HoTT GAM, EAM, ESC -> send batter packet
     if(device[GAM].present || device[EAM].present || device[ESC].present) {
         sendCRSFbattery();
 
-        // HoTT GAM and EAM
+        // HoTT GAM and EAM but no GPS/Vario or Vario -> send vario packet too
         if((!device[GPS].present && !device[VARIO].present) && (device[GAM].present || device[EAM].present))
             sendCRSFvario();
     }
