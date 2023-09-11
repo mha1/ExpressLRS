@@ -29,10 +29,10 @@ private:
     void processFrame();
     uint8_t calcFrameCRC(uint8_t *buf);
     
-    void sendCRSFtelemetry();
-    void sendCRSFvario();
-    void sendCRSFgps();
-    void sendCRSFbattery();
+    void scheduleCRSFtelemetry(uint32_t now);
+    void sendCRSFvario(uint32_t now);
+    void sendCRSFgps(uint32_t now);
+    void sendCRSFbattery(uint32_t now);
 
     uint16_t getHoTTvoltage();
     uint16_t getHoTTcurrent();
@@ -45,6 +45,7 @@ private:
     uint16_t getHoTTgroundspeed();
     uint16_t getHoTTheading();
     uint8_t  getHoTTsatellites();
+    uint16_t getHoTTMSLaltitude();
 
     uint32_t htobe24(uint32_t val);
 };

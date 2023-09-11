@@ -8,9 +8,15 @@
 
 #define HOTT_POLL_RATE      150     // default HoTT bus poll rate [ms]
 #define HOTT_LEAD_OUT       20      // minimum gap between end of payload to next poll
-#define CRSF_TELEMETRY_RATE 50      // CRSF telemetry packet delivery rate
 
 #define DISCOVERY_TIMEOUT   30000   // 30s device discovery time
+
+#define VARIO_MIN_CRSFRATE  1000    // CRSF telemetry packets will be sent if
+#define GPS_MIN_CRSFRATE    5000    // min rate timers in [ms] have expired
+#define BATT_MIN_CRSFRATE   5000    // or packet value has changed. Fastest to
+                                    // be expected update rate will by about 150ms due
+                                    // to HoTT bus speed if only a HoTT Vario is connected and
+                                    // values change every HoTT bus poll cycle.
 
 #define FRAME_SIZE          45      // HoTT telemetry frame size
 #define CMD_LEN             2       // HoTT poll command length
@@ -265,10 +271,6 @@ typedef struct crsf_sensor_gps_s {
     uint8_t satellites;                             // satellites
 } PACKED crsf_sensor_gps_t;
 
-CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
-CRSF_MK_FRAME_T(crsf_sensor_battery_t) crsfBatt = {0};
-CRSF_MK_FRAME_T(crsf_sensor_gps_t) crsfGPS = {0};
-
 FIFO_GENERIC<HOTT_MAX_BUF_LEN> hottInputBuffer;
 
 static hottBusframe_t hottBusFrame;
@@ -297,7 +299,6 @@ void SerialHoTT_TLM::handleUARTout()
     uint32_t now = millis();
 
     static uint32_t nextPoll = now + HOTT_POLL_RATE;
-    static uint32_t nextCRSFtelemetry = now + CRSF_TELEMETRY_RATE;
     static uint32_t discoveryTimer = now + DISCOVERY_TIMEOUT;
 
     // device discovery timer
@@ -326,12 +327,7 @@ void SerialHoTT_TLM::handleUARTout()
             processFrame();
     }
 
-    // CRSF telemetry packet scheduler
-    if(now >= nextCRSFtelemetry) {
-        nextCRSFtelemetry = now + CRSF_TELEMETRY_RATE;
-  
-        sendCRSFtelemetry();
-    }
+    scheduleCRSFtelemetry(now);
 }
 
 void SerialHoTT_TLM::pollNextDevice() {
@@ -415,59 +411,96 @@ uint8_t SerialHoTT_TLM::calcFrameCRC(uint8_t *buf) {
     return sum = sum & 0xff;
 }
 
-void SerialHoTT_TLM::sendCRSFtelemetry() {
+void SerialHoTT_TLM::scheduleCRSFtelemetry(uint32_t now) {
     // HoTT combined GPS/Vario -> send GPS and vario packet
     if(device[GPS].present) {
-        sendCRSFgps();
-        sendCRSFvario();
+        sendCRSFgps(now);
+        sendCRSFvario(now);
     } else
         // HoTT stand alone Vario and no GPS/Vario -> just send vario packet
         if(device[VARIO].present)
-            sendCRSFvario();
+            sendCRSFvario(now);
 
     // HoTT GAM, EAM, ESC -> send batter packet
     if(device[GAM].present || device[EAM].present || device[ESC].present) {
-        sendCRSFbattery();
+        sendCRSFbattery(now);
 
         // HoTT GAM and EAM but no GPS/Vario or Vario -> send vario packet too
         if((!device[GPS].present && !device[VARIO].present) && (device[GAM].present || device[EAM].present))
-            sendCRSFvario();
+            sendCRSFvario(now);
     }
 }
 
-void SerialHoTT_TLM::sendCRSFvario() {
-    crsfBaro.p.altitude    = htobe16(getHoTTaltitude()*10 + 5000);      // Hott 500 = 0m, ELRS 10000 = 0.0m
-    crsfBaro.p.verticalspd = htobe16(getHoTTvv() - 30000);
+void SerialHoTT_TLM::sendCRSFvario(uint32_t now) {
+    static uint32_t lastVarioSent = 0;
+    static uint32_t lastVarioCRC = 0;
 
+    // indicate external sensor is present
     telemetry.SetCrsfBaroSensorDetected(true);
 
+    // prepare CRSF telemetry packet
+    CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t) crsfBaro = {0};
+    crsfBaro.p.altitude    = htobe16(getHoTTaltitude()*10 + 5000);      // Hott 500 = 0m, ELRS 10000 = 0.0m
+    crsfBaro.p.verticalspd = htobe16(getHoTTvv() - 30000);
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
-    telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
+    
+    // send packet only if min rate timer expired or values have changed
+    if((now >= lastVarioSent + VARIO_MIN_CRSFRATE) || (lastVarioCRC != crsfBaro.crc)) {
+        lastVarioSent = now;
+    
+        telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
+    }
+
+    lastVarioCRC = crsfBaro.crc;
 }
 
-void SerialHoTT_TLM::sendCRSFgps() {
+void SerialHoTT_TLM::sendCRSFgps(uint32_t now) {
+    static uint32_t lastGPSSent = 0;
+    static uint32_t lastGPSCRC = 0;
+
+    // prepare CRSF telemetry packet
+    CRSF_MK_FRAME_T(crsf_sensor_gps_t) crsfGPS = {0};
     crsfGPS.p.latitude    = htobe32(getHoTTlatitude());
     crsfGPS.p.longitude   = htobe32(getHoTTlongitude());
     crsfGPS.p.groundspeed = htobe16(getHoTTgroundspeed()*10);           // Hott 1 = 1 km/h, ELRS 1 = 0.1km/h 
     crsfGPS.p.heading     = htobe16(getHoTTheading()*100);
-    crsfGPS.p.altitude    = htobe16(getHoTTaltitude() - 500 + 1000);    // HoTT 0m = 500, CRSF: 0m = 1000
+    crsfGPS.p.altitude    = htobe16(getHoTTMSLaltitude() + 1000);       // HoTT 1 = 1m, CRSF: 0m = 1000
     crsfGPS.p.satellites  = getHoTTsatellites();
-
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfGPS, CRSF_FRAMETYPE_GPS, CRSF_FRAME_SIZE(sizeof(crsf_sensor_gps_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
     
-    telemetry.AppendTelemetryPackage((uint8_t *)&crsfGPS);
+    // send packet only if min rate timer expired or values have changed
+    if((now >= lastGPSSent + GPS_MIN_CRSFRATE) || (lastGPSCRC != crsfGPS.crc)) {
+        lastGPSSent = now;
+    
+        telemetry.AppendTelemetryPackage((uint8_t *)&crsfGPS);
+    }
+
+    lastGPSCRC = crsfGPS.crc;
 }
 
-void SerialHoTT_TLM::sendCRSFbattery() {
+void SerialHoTT_TLM::sendCRSFbattery(uint32_t now) {
+    static uint32_t lastBatterySent = 0;
+    static uint32_t lastBatteryCRC = 0;
+
+    // indicate external sensor is present
+    telemetry.SetCrsfBatterySensorDetected(true);
+
+    // prepare CRSF telemetry packet
+    CRSF_MK_FRAME_T(crsf_sensor_battery_t) crsfBatt = {0};
     crsfBatt.p.voltage   = htobe16(getHoTTvoltage());   
     crsfBatt.p.current   = htobe16(getHoTTcurrent());   
     crsfBatt.p.capacity  = htobe24(getHoTTcapacity()*10);               // HoTT: 1 = 10mAh, CRSF: 1 ? 1 = 1mAh
     crsfBatt.p.remaining = getHoTTremaining();
-
-    telemetry.SetCrsfBatterySensorDetected(true);
-
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfBatt, CRSF_FRAMETYPE_BATTERY_SENSOR, CRSF_FRAME_SIZE(sizeof(crsf_sensor_battery_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
-    telemetry.AppendTelemetryPackage((uint8_t *)&crsfBatt);
+    
+    // send packet only if min rate timer expired or values have changed
+    if((now >= lastBatterySent + BATT_MIN_CRSFRATE) || (lastBatteryCRC != crsfBatt.crc)) {
+        lastBatterySent = now;
+    
+        telemetry.AppendTelemetryPackage((uint8_t *)&crsfBatt);
+    }
+
+    lastBatteryCRC = crsfBatt.crc;
 }
 
 // HoTT telemetry data getters
@@ -605,6 +638,13 @@ uint8_t SerialHoTT_TLM::getHoTTsatellites() {
         return 0;
         
     return gps.Satellites;
+}
+
+uint16_t SerialHoTT_TLM::getHoTTMSLaltitude() {
+    if(!device[GPS].present)
+        return 0;
+        
+    return gps.MSLAltitude;
 }
 
 uint32_t SerialHoTT_TLM::htobe24(uint32_t val) {
