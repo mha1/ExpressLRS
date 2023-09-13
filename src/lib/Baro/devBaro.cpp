@@ -112,7 +112,7 @@ static void Baro_PublishPressure(uint32_t pressuredPa)
         telemetry.AppendTelemetryPackage((uint8_t *)&crsfVario);
         // ETHOS hack end
 */
-        }
+    }
 }
 
 static int start()
