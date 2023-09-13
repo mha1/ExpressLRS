@@ -309,7 +309,7 @@ void SerialHoTT_TLM::handleUARTout()
     if(now >= nextPoll) {          
         nextPoll = now + HOTT_POLL_RATE; 
 
-        // start up in device discovery mode, the after timeout regular operation 
+        // start up in device discovery mode, after timeout regular operation 
         pollNextDevice();
     }
 
