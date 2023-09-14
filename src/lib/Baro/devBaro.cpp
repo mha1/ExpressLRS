@@ -98,7 +98,7 @@ static void Baro_PublishPressure(uint32_t pressuredPa)
         CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
         telemetry.AppendTelemetryPackage((uint8_t *)&crsfBaro);
 
-/*
+#if defined(ETHOS_VSPD7)
         // hack for Ethos which generates vario audio on 0x07 Vspd
         // should be removed once ETHOS switches to 0x09 content 
         typedef struct crsf_sensor_vario_s {
@@ -111,7 +111,7 @@ static void Baro_PublishPressure(uint32_t pressuredPa)
         CRSF::SetHeaderAndCrc((uint8_t *)&crsfVario, CRSF_FRAMETYPE_VARIO, CRSF_FRAME_SIZE(sizeof(crsf_sensor_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
         telemetry.AppendTelemetryPackage((uint8_t *)&crsfVario);
         // ETHOS hack end
-*/
+#endif
     }
 }
 
