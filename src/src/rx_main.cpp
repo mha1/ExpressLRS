@@ -20,7 +20,6 @@
 #include "rx-serial/SerialCRSF.h"
 #include "rx-serial/SerialSBUS.h"
 #include "rx-serial/SerialSUMD.h"
-#include "rx-serial/SerialHoTT_TLM.h"
 #include "rx-serial/SerialAirPort.h"
 
 #include "rx-serial/devSerialIO.h"
