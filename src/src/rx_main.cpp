@@ -111,6 +111,7 @@ MSP2CROSSFIRE msp2crsf;
 unsigned long rebootTime = 0;
 extern bool webserverPreventAutoStart;
 bool pwmSerialDefined = false;
+bool hottTlmSerialSUMD = false;
 #endif
 uint32_t serialBaud;
 
@@ -1183,7 +1184,7 @@ static void setupSerial()
 	else if (config.GetSerialProtocol() == PROTOCOL_SUMD)
     {
         sumdSerialOutput = true;
-        serialBaud = 115200;
+        serialBaud = SUMDBAUD;
     }
     bool invert = config.GetSerialProtocol() == PROTOCOL_SBUS || config.GetSerialProtocol() == PROTOCOL_INVERTED_CRSF || config.GetSerialProtocol() == PROTOCOL_DJI_RS_PRO;
 
@@ -1243,7 +1244,38 @@ static void setupSerial()
     SerialMode mode = (sbusSerialOutput || sumdSerialOutput)  ? SERIAL_TX_ONLY : SERIAL_FULL;
     Serial.begin(serialBaud, config, mode, -1, invert);
 #elif defined(PLATFORM_ESP32)
+<<<<<<< HEAD
     uint32_t config = sbusSerialOutput ? SERIAL_8E2 : SERIAL_8N1;
+=======
+    uint32_t config = SERIAL_8N1;
+
+    if(sbusSerialOutput)
+    {
+        config = SERIAL_8E2;
+    }
+    else if(hottTlmSerial)
+    {
+        config = SERIAL_8N2;
+
+        // ER6MH
+        // HoTT TLM at CRSF connector (RX GPIO3, TX GPIO1)
+        // SUMD output at channel 6 connector (RX not used, TX GPIO9)
+        //Serial1.begin(115200, SERIAL_8N1, -1, 9, invert);
+
+        // ER8GVMH
+        // SUMD at CRSF connector (RX GPIO3, TX GPIO1)
+        // HoTT TLM output at channel 7 and 8 connectors (RX GPIO19, TX GPIO22)
+        //Serial1.begin(115200, SERIAL_8N1, 3, 1, invert);
+
+        // add SUMD output if second serial device is enabled
+        if (GPIO_PIN_SERIAL1_TX != -1) {
+            hottTlmSerialSUMD = true; 
+
+            Serial1.begin(SUMDBAUD, SUMDCONFIG, GPIO_PIN_SERIAL1_RX, GPIO_PIN_SERIAL1_TX, invert);
+        }
+    }
+
+>>>>>>> 335265d6 (initial commit)
     Serial.begin(serialBaud, config, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_TX, invert);
 #endif
 

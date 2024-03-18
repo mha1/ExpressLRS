@@ -1,6 +1,9 @@
 #include "SerialIO.h"
 #include "crc.h"
 
+#define SUMDBAUD    115200
+#define SUMDCONFIG  SERIAL_8N1
+
 class SerialSUMD : public SerialIO {
 public:
     explicit SerialSUMD(Stream &out, Stream &in) : SerialIO(&out, &in) { crc2Byte.init(16, 0x1021); }
