@@ -6,6 +6,13 @@
 #define SUMDBAUD    115200
 #define SUMDCONFIG  SERIAL_8N1
 
+#define SUMD_HEADER_SIZE		3														// 3 Bytes header
+#define SUMD_DATA_SIZE_16CH		(16*2)													// 2 Bytes per channel
+#define SUMD_CRC_SIZE			2														// 16 bit CRC
+#define SUMD_FRAME_16CH_LEN		(SUMD_HEADER_SIZE+SUMD_DATA_SIZE_16CH+SUMD_CRC_SIZE)
+
+const auto SUMD_CALLBACK_INTERVAL_MS = 10;
+
 class SUMD {
 public:
     SUMD() { crc2Byte.init(16, 0x1021); }
