@@ -35,11 +35,10 @@ typedef struct crsf_sensor_gps_s
 } PACKED crsf_sensor_gps_t;
 
 extern Telemetry telemetry;
-extern bool hottTlmSerialSUMD;
 
 uint32_t SerialHoTT_TLM::sendRCFrame(bool frameAvailable, bool frameMissed, uint32_t *channelData)
 {
-    if (!frameAvailable || !hottTlmSerialSUMD) {
+    if (!frameAvailable || !addSUMD) {
         return DURATION_IMMEDIATELY;
     }
 

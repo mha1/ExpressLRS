@@ -260,13 +260,25 @@ public:
     explicit SerialHoTT_TLM(Stream &out, Stream &in)
         : SUMD(), SerialIO(&out, &in)
     {
+        if (GPIO_PIN_SERIAL1_TX != -1) {
+            addSUMD = true;
+
+            Serial1.begin(SUMDBAUD, SUMDCONFIG, GPIO_PIN_SERIAL1_RX, GPIO_PIN_SERIAL1_TX, false);
+        }
+        
         uint32_t now = millis();
 
         lastPoll = now;
         discoveryTimerStart = now;
     }
 
-    virtual ~SerialHoTT_TLM() {}
+    virtual ~SerialHoTT_TLM()
+    {
+        if (addSUMD)
+        {
+            Serial1.end();
+        }
+    }
 
     void queueLinkStatisticsPacket() override {}
     void queueMSPFrameTransmission(uint8_t *data) override {}
@@ -341,4 +353,6 @@ private:
     const uint8_t MinDivide = 6;
     const int32_t MinScale = 1000000L;
     const int32_t DegScale = 10000000L;
+
+    bool addSUMD = false;
 };
