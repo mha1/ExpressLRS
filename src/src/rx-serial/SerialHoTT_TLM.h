@@ -2,7 +2,7 @@
 
 #include "SerialIO.h"
 #include "device.h"
-#include "crc.h"
+#include "SerialSUMD.h"
 
 #define PACKED __attribute__((packed))
 
@@ -254,11 +254,11 @@ typedef struct
 } hottDevice_t;
 
 
-class SerialHoTT_TLM : public SerialIO
+class SerialHoTT_TLM : SUMD, public SerialIO
 {
 public:
     explicit SerialHoTT_TLM(Stream &out, Stream &in)
-        : SerialIO(&out, &in)
+        : SUMD(), SerialIO(&out, &in)
     {
         uint32_t now = millis();
 
@@ -287,8 +287,6 @@ private:
     void sendCRSFvario(uint32_t now);
     void sendCRSFgps(uint32_t now);
     void sendCRSFbattery(uint32_t now);
-
-    Crc2Byte crc2Byte;
 
     uint16_t getHoTTvoltage();
     uint16_t getHoTTcurrent();
