@@ -9,17 +9,11 @@
 
 const auto SUMD_CALLBACK_INTERVAL_MS = 10;
 
-uint32_t SerialSUMD::sendRCFrame(bool frameAvailable, bool frameMissed, uint32_t *channelData)
+void SUMD::prepareSUMD(uint32_t *channelData, uint8_t *outBuffer)
 {
-    if (!frameAvailable) {
-        return DURATION_IMMEDIATELY;
-    }
-
-	  uint8_t outBuffer[SUMD_FRAME_16CH_LEN];
-
-	  outBuffer[0] = 0xA8;		//Graupner
-	  outBuffer[1] = 0x01;	  //SUMD
-	  outBuffer[2] = 0x10;		//16CH
+    outBuffer[0] = 0xA8;	// Graupner
+    outBuffer[1] = 0x01;    // SUMD
+    outBuffer[2] = 0x10;	// 16CH
 
     uint16_t us = (CRSF_to_US(channelData[0]) << 3);
     outBuffer[3] = us >> 8;
@@ -70,11 +64,22 @@ uint32_t SerialSUMD::sendRCFrame(bool frameAvailable, bool frameMissed, uint32_t
     outBuffer[33] = us >> 8;
     outBuffer[34] = us & 0x00ff;
 
-	  uint16_t crc = crc2Byte.calc(outBuffer, (SUMD_HEADER_SIZE + SUMD_DATA_SIZE_16CH), 0);
-	  outBuffer[35] = (uint8_t)(crc >> 8);
-	  outBuffer[36] = (uint8_t)(crc & 0x00ff);
+    uint16_t crc = crc2Byte.calc(outBuffer, (SUMD_HEADER_SIZE + SUMD_DATA_SIZE_16CH), 0);
+    outBuffer[35] = (uint8_t)(crc >> 8);
+    outBuffer[36] = (uint8_t)(crc & 0x00ff);
+}
 
-	  _outputPort->write(outBuffer, sizeof(outBuffer));
+uint32_t SerialSUMD::sendRCFrame(bool frameAvailable, bool frameMissed, uint32_t *channelData)
+{
+    if (!frameAvailable) {
+        return DURATION_IMMEDIATELY;
+    }
+
+    uint8_t outBuffer[SUMD_FRAME_16CH_LEN];
+
+    prepareSUMD(channelData, outBuffer);
+
+    _outputPort->write(outBuffer , sizeof(outBuffer));
 
     return SUMD_CALLBACK_INTERVAL_MS;
 }
