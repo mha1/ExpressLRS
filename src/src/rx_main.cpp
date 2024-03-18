@@ -116,6 +116,7 @@ MSP2CROSSFIRE msp2crsf;
 unsigned long rebootTime = 0;
 extern bool webserverPreventAutoStart;
 bool pwmSerialDefined = false;
+bool hottTlmSerialSUMD = false;
 #endif
 uint32_t serialBaud;
 
@@ -1238,7 +1239,7 @@ static void setupSerial()
 	else if (config.GetSerialProtocol() == PROTOCOL_SUMD)
     {
         sumdSerialOutput = true;
-        serialBaud = 115200;
+        serialBaud = SUMDBAUD;
     }
 #if defined(PLATFORM_ESP8266) || defined(PLATFORM_ESP32)
     else if (config.GetSerialProtocol() == PROTOCOL_HOTT_TLM)
@@ -1324,6 +1325,23 @@ static void setupSerial()
     else if(hottTlmSerial)
     {
         config = SERIAL_8N2;
+
+        // ER6MH
+        // HoTT TLM at CRSF connector (RX GPIO3, TX GPIO1)
+        // SUMD output at channel 6 connector (RX not used, TX GPIO9)
+        //Serial1.begin(115200, SERIAL_8N1, -1, 9, invert);
+
+        // ER8GVMH
+        // SUMD at CRSF connector (RX GPIO3, TX GPIO1)
+        // HoTT TLM output at channel 7 and 8 connectors (RX GPIO19, TX GPIO22)
+        //Serial1.begin(115200, SERIAL_8N1, 3, 1, invert);
+
+        // add SUMD output if second serial device is enabled
+        if (GPIO_PIN_SERIAL1_TX != -1) {
+            hottTlmSerialSUMD = true; 
+
+            Serial1.begin(SUMDBAUD, SUMDCONFIG, GPIO_PIN_SERIAL1_RX, GPIO_PIN_SERIAL1_TX, invert);
+        }
     }
 
     Serial.begin(serialBaud, config, GPIO_PIN_RCSIGNAL_RX, GPIO_PIN_RCSIGNAL_TX, invert);

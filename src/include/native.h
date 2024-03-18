@@ -71,6 +71,7 @@ public:
 };
 
 static HardwareSerial Serial;
+static HardwareSerial Serial1;
 static Stream *SerialLogger = &Serial;
 
 inline void interrupts() {}

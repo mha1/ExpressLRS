@@ -2,6 +2,7 @@
 
 #include "SerialIO.h"
 #include "device.h"
+#include "crc.h"
 
 #define PACKED __attribute__((packed))
 
@@ -269,7 +270,7 @@ public:
 
     void queueLinkStatisticsPacket() override {}
     void queueMSPFrameTransmission(uint8_t *data) override {}
-    uint32_t sendRCFrame(bool frameAvailable, bool frameMissed, uint32_t *channelData) override { return DURATION_IMMEDIATELY; };
+    uint32_t sendRCFrame(bool frameAvailable, bool frameMissed, uint32_t *channelData) override;
 
     int getMaxSerialReadSize() override;
     void sendQueuedData(uint32_t maxBytesToSend) override;
@@ -286,6 +287,8 @@ private:
     void sendCRSFvario(uint32_t now);
     void sendCRSFgps(uint32_t now);
     void sendCRSFbattery(uint32_t now);
+
+    Crc2Byte crc2Byte;
 
     uint16_t getHoTTvoltage();
     uint16_t getHoTTcurrent();
