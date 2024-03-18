@@ -260,12 +260,13 @@ public:
     explicit SerialHoTT_TLM(Stream &out, Stream &in)
         : SUMD(), SerialIO(&out, &in)
     {
+#if defined(PLATFORM_ESP32)
         if (GPIO_PIN_SERIAL1_TX != -1) {
             addSUMD = true;
 
             Serial1.begin(SUMDBAUD, SUMDCONFIG, GPIO_PIN_SERIAL1_RX, GPIO_PIN_SERIAL1_TX, false);
         }
-        
+#endif
         uint32_t now = millis();
 
         lastPoll = now;
