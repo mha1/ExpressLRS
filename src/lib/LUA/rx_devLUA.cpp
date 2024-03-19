@@ -6,17 +6,25 @@
 
 extern void deferExecution(uint32_t ms, std::function<void()> f);
 extern void reconfigureSerial();
+extern void reconfigureSerial1();
 extern bool BindingModeRequest;
 
 static char modelString[] = "000";
 #if defined(GPIO_PIN_PWM_OUTPUTS)
-static char pwmModes[] = "50Hz;60Hz;100Hz;160Hz;333Hz;400Hz;10kHzDuty;On/Off;DShot;Serial RX;Serial TX;I2C SCL;I2C SDA";
+static char pwmModes[] = "50Hz;60Hz;100Hz;160Hz;333Hz;400Hz;10kHzDuty;On/Off;DShot;Serial RX;Serial TX;I2C SCL;I2C SDA;Serial2 RX;Serial2 TX";
 #endif
 
 static struct luaItem_selection luaSerialProtocol = {
     {"Protocol", CRSF_TEXT_SELECTION},
     0, // value
     "CRSF;Inverted CRSF;SBUS;Inverted SBUS;SUMD;DJI RS Pro;HoTT Telemetry",
+    STR_EMPTYSPACE
+};
+
+static struct luaItem_selection luaSerial1Protocol = {
+    {"Protocol2", CRSF_TEXT_SELECTION},
+    0, // value
+    "NONE;CRSF;Inverted CRSF;SBUS;Inverted SBUS;SUMD;DJI RS Pro;HoTT Telemetry",
     STR_EMPTYSPACE
 };
 
@@ -163,6 +171,47 @@ static struct luaItem_command luaBindMode = {
 #if defined(GPIO_PIN_PWM_OUTPUTS)
 static void luaparamMappingChannelOut(struct luaPropertiesCommon *item, uint8_t arg)
 {
+    bool sclAssigned = false;
+    bool sdaAssigned = false;
+    bool serial1rxAssigned = false;
+    bool serial1txAssigned = false;
+
+    const char *no1Option    = ";";
+    const char *no2Options   = ";;";
+    const char *dshot        = ";DShot";
+    const char *serial_RX    = ";Serial RX";
+    const char *serial_TX    = ";Serial TX";
+    const char *i2c_SCL      = ";I2C SCL;";
+    const char *i2c_SDA      = ";;I2C SDA";
+    const char *i2c_BOTH     = ";I2C SCL;I2C SDA";
+    const char *serial1_RX   = ";Serial2 RX;";
+    const char *serial1_TX   = ";;Serial2 TX";
+    const char *serial1_BOTH = ";Serial2 RX;Serial2 TX";
+
+    const char *pModeString;
+
+
+    // find out if use once only modes have already been assigned
+    for (uint8_t ch = 0; ch < GPIO_PIN_PWM_OUTPUTS_COUNT; ch++)
+    {
+      if (ch == (arg -1))
+        continue;
+
+      eServoOutputMode mode = (eServoOutputMode)config.GetPwmChannel(ch)->val.mode;
+      
+      if (mode == somSCL)
+        sclAssigned = true;
+
+      if (mode == somSDA)
+        sdaAssigned = true;
+
+      if (mode == somSerial1RX)
+        serial1rxAssigned = true;
+
+      if (mode == somSerial1TX)
+        serial1txAssigned = true;
+    }
+
     setLuaUint8Value(&luaMappingChannelOut, arg);
 
     // When the selected output channel changes, update the available PWM modes for that pin
@@ -173,47 +222,117 @@ static void luaparamMappingChannelOut(struct luaPropertiesCommon *item, uint8_t 
     // DShot output (1 option)
     // ;DShot
     // ESP8266 enum skips this, so it is never present
-    if (GPIO_PIN_PWM_OUTPUTS[arg-1] != 0)
+    if (GPIO_PIN_PWM_OUTPUTS[arg-1] != 0)   // DShot doesn't work with GPIO0, exclude it
     {
-        strcat(pwmModes, ";DShot");
+        pModeString = dshot;
     }
     else
 #endif
     {
-        strcat(pwmModes, ";");
+        pModeString = no1Option;
     }
+    strcat(pwmModes, pModeString);
 
     // SerialIO outputs (1 option)
     // ;[Serial RX] | [Serial TX]
     if (GPIO_PIN_PWM_OUTPUTS[arg-1] == 3)
     {
-        strcat(pwmModes, ";Serial RX");
+        pModeString = serial_RX;
     }
     else if (GPIO_PIN_PWM_OUTPUTS[arg-1] == 1)
     {
-        strcat(pwmModes, ";Serial TX");
+        pModeString = serial_TX;
     }
     else
     {
-        strcat(pwmModes, ";");
+        pModeString = no1Option;
     }
+    strcat(pwmModes, pModeString);
 
     // I2C pins (2 options)
     // ;[I2C SCL] ;[I2C SDA]
-    // If the target defines SCL/SDA then those pins MUST be used,
-    // otherwise allow any pin to be either SCL or SDA
-    if (GPIO_PIN_PWM_OUTPUTS[arg-1] == GPIO_PIN_SCL)
+    if (GPIO_PIN_SCL != UNDEF_PIN || GPIO_PIN_SDA != UNDEF_PIN)
     {
-        strcat(pwmModes, ";I2C SCL;");
+        // If the target defines SCL/SDA then those pins MUST be used
+        if (GPIO_PIN_PWM_OUTPUTS[arg-1] == GPIO_PIN_SCL)
+        {
+            pModeString = i2c_SCL;
+        }
+        else if (GPIO_PIN_PWM_OUTPUTS[arg-1] == GPIO_PIN_SDA)
+        {
+            pModeString = i2c_SDA;
+        }
+        else
+        {
+            pModeString = no2Options;
+        }
+    } 
+    else
+    {  
+        // otherwise allow any pin to be either SCL or SDA but only once
+        if (sclAssigned && !sdaAssigned)
+        {
+            pModeString = i2c_SDA;
+        }
+        else if (sdaAssigned && !sclAssigned)
+        {
+            pModeString = i2c_SCL;
+        }
+        else if (!sclAssigned && !sdaAssigned)
+        {
+            pModeString = i2c_BOTH;
+        }
+        else
+        {
+            pModeString = no2Options;
+        }
     }
-    else if (GPIO_PIN_PWM_OUTPUTS[arg-1] == GPIO_PIN_SDA)
+    strcat(pwmModes, pModeString);
+
+    // nothing to do for unsupported somPwm mode
+    strcat(pwmModes, no1Option);
+
+#if defined(PLATFORM_ESP32)
+    // secondary Serial pins (2 options)
+    // ;[SERIAL2 RX] ;[SERIAL2_TX]
+    if (GPIO_PIN_SERIAL1_RX != UNDEF_PIN || GPIO_PIN_SERIAL1_TX != UNDEF_PIN)
     {
-        strcat(pwmModes, ";;I2C SDA");
+        // If the target defines Serial2 RX/TX then those pins MUST be used
+        if (GPIO_PIN_PWM_OUTPUTS[arg-1] == GPIO_PIN_SERIAL1_RX)
+        {
+            pModeString = serial1_RX;
+        }
+        else if (GPIO_PIN_PWM_OUTPUTS[arg-1] == GPIO_PIN_SERIAL1_TX)
+        {
+            pModeString = serial1_TX;
+        }
+        else
+        { 
+            pModeString = no2Options;
+        }
+    } 
+    else
+    {   // otherwise allow any pin to be either RX or TX but only once
+        if (serial1txAssigned && !serial1rxAssigned)
+        {
+            pModeString = serial1_RX;
+        }        
+        else if (serial1rxAssigned && !serial1txAssigned)
+        {
+            pModeString = serial1_TX;
+        }
+
+        else if (!serial1rxAssigned && !serial1txAssigned)
+        {
+            pModeString = serial1_BOTH;
+        } 
+        else
+        {
+            pModeString = no2Options;
+        }
     }
-    else if (GPIO_PIN_SCL == UNDEF_PIN || GPIO_PIN_SDA == UNDEF_PIN)
-    {
-        strcat(pwmModes, ";I2C SCL;I2C SDA");
-    }
+    strcat(pwmModes, pModeString);
+#endif
 
     // trim off trailing semicolons (assumes pwmModes has at least 1 non-semicolon)
     for (auto lastPos = strlen(pwmModes)-1; pwmModes[lastPos] == ';'; lastPos--)
@@ -366,7 +485,20 @@ static void registerLuaParameters()
     }
   });
 
-  if (config.GetSerialProtocol() == PROTOCOL_SBUS || config.GetSerialProtocol() == PROTOCOL_INVERTED_SBUS || config.GetSerialProtocol() == PROTOCOL_DJI_RS_PRO)
+  registerLUAParameter(&luaSerial1Protocol, [](struct luaPropertiesCommon* item, uint8_t arg){
+    config.SetSerial1Protocol((eSerial1Protocol)arg);
+    if (config.IsModified()) {
+      deferExecution(100, [](){
+        reconfigureSerial1();
+      });
+    }
+  });
+
+  eSerialProtocol prot0 = config.GetSerialProtocol();
+  eSerial1Protocol prot1 = config.GetSerial1Protocol();
+
+  if (prot0 == PROTOCOL_SBUS || prot0 == PROTOCOL_INVERTED_SBUS || prot0 == PROTOCOL_DJI_RS_PRO ||
+      prot1 == PROTOCOL_SERIAL1_SBUS || prot1 == PROTOCOL_SERIAL1_INVERTED_SBUS || prot1 == PROTOCOL_SERIAL1_DJI_RS_PRO)
   {
     registerLUAParameter(&luaFailsafeMode, [](struct luaPropertiesCommon* item, uint8_t arg){
       config.SetFailsafeMode((eFailsafeMode)arg);
@@ -434,6 +566,7 @@ static void registerLuaParameters()
 static int event()
 {
   setLuaTextSelectionValue(&luaSerialProtocol, config.GetSerialProtocol());
+  setLuaTextSelectionValue(&luaSerial1Protocol, config.GetSerial1Protocol());
   setLuaTextSelectionValue(&luaFailsafeMode, config.GetFailsafeMode());
 
   if (GPIO_PIN_ANT_CTRL != UNDEF_PIN)
