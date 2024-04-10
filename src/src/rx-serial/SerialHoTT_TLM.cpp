@@ -352,7 +352,8 @@ int16_t SerialHoTT_TLM::getHoTTaltitude()
     }
     else if (device[GAM].present)
     {
-        return gam.altitude;
+        //return gam.altitude;          // misuse ALT to carry RPM
+        return gam.rpm1;  
     }
 
     return 0;
