@@ -17,7 +17,7 @@
 #define VARIO_MIN_CRSFRATE 1000 // CRSF telemetry packets will be sent if
 #define GPS_MIN_CRSFRATE 5000   // min rate timers in [ms] have expired
 #define BATT_MIN_CRSFRATE 5000  // or packet value has changed. Fastest to
-                                // be expected update rate will by about 150ms due
+#define ATT_MIN_CRSFRATE 5000   // be expected update rate will by about 150ms due
                                 // to HoTT bus speed if only a HoTT Vario is connected and
                                 // values change every HoTT bus poll cycle.
 
@@ -30,6 +30,13 @@ typedef struct crsf_sensor_gps_s
     uint16_t altitude;    // meters, +1000m big endian
     uint8_t satellites;   // satellites
 } PACKED crsf_sensor_gps_t;
+
+typedef struct crsf_sensor_attitude_s
+{
+    int16_t temp;         // temperature, degree big endian
+    int16_t rpm;         // rpm, rpm / 10 big endian
+    int16_t voltage2;    // voltage 2, V * 10 big endian
+} PACKED crsf_sensor_attitude_t;
 
 extern Telemetry telemetry;
 
@@ -224,6 +231,7 @@ void SerialHoTT_TLM::scheduleCRSFtelemetry(uint32_t now)
     if (device[GAM].present || device[EAM].present || device[ESC].present)
     {
         sendCRSFbattery(now);
+        sendCRSFattitude(now);
 
         // HoTT GAM and EAM but no GPS/Vario or Vario -> send vario packet too
         if ((!device[GPS].present && !device[VARIO].present) && (device[GAM].present || device[EAM].present))
@@ -303,6 +311,27 @@ void SerialHoTT_TLM::sendCRSFbattery(uint32_t now)
     }
 
     lastBatteryCRC = crsfBatt.crc;
+}
+
+void SerialHoTT_TLM::sendCRSFattitude(uint32_t now)
+{
+    // prepare CRSF telemetry packet
+    CRSF_MK_FRAME_T(crsf_sensor_attitude_t)
+    crsfAttitude = {0};
+    crsfAttitude.p.temp = htobe16(getHoTTtemp());
+    crsfAttitude.p.rpm = htobe16(getHoTTrpm());
+    crsfAttitude.p.voltage2 = htobe16(getHoTTvoltage2()); 
+    CRSF::SetHeaderAndCrc((uint8_t *)&crsfAttitude, CRSF_FRAMETYPE_ATTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_attitude_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+
+    // send packet only if min rate timer expired or values have changed
+    if ((now - lastAttitudeSent >= ATT_MIN_CRSFRATE) || (lastAttitudeCRC != crsfAttitude.crc))
+    {
+        lastAttitudeSent = now;
+
+        telemetry.AppendTelemetryPackage((uint8_t *)&crsfAttitude);
+    }
+
+    lastAttitudeCRC = crsfAttitude.crc;    
 }
 
 // HoTT telemetry data getters
@@ -496,6 +525,67 @@ uint16_t SerialHoTT_TLM::getHoTTMSLaltitude()
     if (device[GPS].present)
     {
         return gps.mslAltitude;
+    }
+
+    return 0;
+}
+
+int16_t SerialHoTT_TLM::getHoTTtemp()
+{
+
+    return 2048;
+
+    if (device[EAM].present)
+    {
+        return (int16_t)eam.temp1 - 20;
+    }
+    else if (device[GAM].present)
+    {
+        return (int16_t)gam.temperature1 - 20;
+    }
+    else if (device[ESC].present)
+    {
+        return (int16_t)esc.escTemp - 20;
+    }
+
+    return 0;
+}
+
+int16_t SerialHoTT_TLM::getHoTTrpm()
+{
+    return 5432;
+
+    if (device[EAM].present)
+    {
+        return eam.rpm;
+    }
+    else if (device[GAM].present)
+    {
+        return gam.rpm1;
+    }
+    else if (device[ESC].present)
+    {
+        return esc.rpm;
+    }
+
+    return 0;
+}
+
+int16_t SerialHoTT_TLM::getHoTTvoltage2()
+{
+    return 16536;
+
+    if (device[EAM].present)
+    {
+        return (int16_t)eam.battVoltage1;
+    }
+    else if (device[GAM].present)
+    {
+        return (int16_t)gam.battery1;
+    }
+    else if (device[ESC].present)
+    {
+        return (int16_t)esc.becVoltage;
     }
 
     return 0;

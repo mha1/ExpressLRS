@@ -314,6 +314,12 @@ private:
     uint8_t getHoTTsatellites();
     uint16_t getHoTTMSLaltitude();
 
+    void sendCRSFattitude(uint32_t now);
+
+    int16_t getHoTTtemp();
+    int16_t getHoTTrpm();
+    int16_t getHoTTvoltage2();
+
     uint32_t htobe24(uint32_t val);
 
     // last received HoTT telemetry packets
@@ -352,6 +358,8 @@ private:
     uint32_t lastGPSCRC = 0;
     uint32_t lastBatterySent = 0;
     uint32_t lastBatteryCRC = 0;
+    uint32_t lastAttitudeSent = 0;
+    uint32_t lastAttitudeCRC = 0;
 
     const uint8_t DegMinScale = 100;
     const uint8_t SecScale = 100;
