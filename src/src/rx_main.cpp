@@ -507,10 +507,30 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
 
     OtaGeneratePacketCrc(&otaPkt);
 
-    SX12XX_Radio_Number_t transmittingRadio = geminiMode ? SX12XX_Radio_All : Radio.GetLastSuccessfulPacketRadio();
-
 #if defined(Regulatory_Domain_EU_CE_2400)
+    SX12XX_Radio_Number_t lastSuccessfulPacketRadio = Radio.GetLastSuccessfulPacketRadio();
+    SX12XX_Radio_Number_t transmittingRadio = (geminiMode || GPIO_PIN_NSS_2 != UNDEF_PIN) ? SX12XX_Radio_All : lastSuccessfulPacketRadio;
+
     transmittingRadio &= ChannelIsClear(transmittingRadio);   // weed out the radio(s) if channel in use
+
+    // if in true diversity mode and both radios report channel clear use the last successful radio
+    if (GPIO_PIN_NSS_2 != UNDEF_PIN && transmittingRadio == SX12XX_Radio_All)
+    {
+        transmittingRadio = lastSuccessfulPacketRadio;
+    }
+    else
+    {
+        if (transmittingRadio == SX12XX_Radio_NONE)
+        {
+            // no packet will be sent due to LBT
+            // Defer TXdoneCallback() to prepare for TLM when the IRQ is normally triggered
+            deferExecutionMicros(ExpressLRS_currAirRate_RFperfParams->TOA, []() {
+                Radio.TXdoneCallback();
+            });
+        }
+    }
+#else
+    SX12XX_Radio_Number_t transmittingRadio = geminiMode ? SX12XX_Radio_All : Radio.GetLastSuccessfulPacketRadio();  
 #endif
 
     if (config.GetForceTlmOff())
@@ -730,14 +750,6 @@ static void ICACHE_RAM_ATTR updateDiversity()
 
 void ICACHE_RAM_ATTR HWtimerCallbackTock()
 {
-    if (tlmSent && Radio.GetLastTransmitRadio() == SX12XX_Radio_NONE)
-    {
-        // Since we were meant to send telemetry, but didn't, defer TXdoneCallback() to when the IRQ is normally triggered.
-        deferExecutionMicros(ExpressLRS_currAirRate_RFperfParams->TOA, []() {
-            Radio.TXdoneCallback();
-        });
-    }
-
     PFDloop.intEvent(micros()); // our internal osc just fired
 
     if (ExpressLRS_currAirRate_Modparams->numOfSends > 1 && !(OtaNonce % ExpressLRS_currAirRate_Modparams->numOfSends))
