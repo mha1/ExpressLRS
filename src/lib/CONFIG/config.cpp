@@ -1048,8 +1048,6 @@ RxConfig::SetDefaults(bool commit)
     m_config.serialProtocol = PROTOCOL_CRSF;
 #endif
 
-    m_config.serial1Protocol = PROTOCOL_SERIAL1_NONE;
-
     if (commit)
     {
         // Prevent rebinding to the flashed UID on first boot
