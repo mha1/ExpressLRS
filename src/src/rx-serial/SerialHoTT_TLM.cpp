@@ -21,6 +21,18 @@
                                 // be expected update rate will by about 150ms due
                                 // to HoTT bus speed if only a HoTT Vario is connected and
                                 // values change every HoTT bus poll cycle.
+#define PT_MIN_CRSFRATE 5000    //
+
+
+#define PASSTHROUGH_MAX_ITEMS 3 // max number of PT tlm items
+
+// CRSF_FRAMETYPE_AP_CUSTOM_TELEM
+typedef struct crsf_sensor_CustomTelemMulti_s
+{
+    uint8_t sub_type;
+    uint8_t size;
+    uint16_t data[PASSTHROUGH_MAX_ITEMS];
+} PACKED crsf_sensor_CustomTelemMulti_t;
 
 typedef struct crsf_sensor_gps_s
 {
@@ -231,6 +243,7 @@ void SerialHoTT_TLM::scheduleCRSFtelemetry(uint32_t now)
     if (device[GAM].present || device[EAM].present || device[ESC].present)
     {
         sendCRSFbattery(now);
+        sendCRSFpassthrough(now);
 
         // HoTT GAM and EAM but no GPS/Vario or Vario -> send vario packet too
         if ((!device[GPS].present && !device[VARIO].present) && (device[GAM].present || device[EAM].present))
@@ -310,6 +323,29 @@ void SerialHoTT_TLM::sendCRSFbattery(uint32_t now)
     }
 
     lastBatteryCRC = crsfBatt.crc;
+}
+
+void SerialHoTT_TLM::sendCRSFpassthrough(uint32_t now)
+{
+    // prepare CRSF telemetry packet
+    CRSF_MK_FRAME_T(crsf_sensor_CustomTelemMulti_t)
+    crsfPT = {0};
+    crsfPT.p.sub_type = CRSF_AP_CUSTOM_TELEM_MULTI_PACKET_PASSTHROUGH;
+    crsfPT.p.size = PASSTHROUGH_MAX_ITEMS;
+    crsfPT.p.data[0] = getHoTTtemp();
+    crsfPT.p.data[1] = getHoTTrpm();
+    crsfPT.p.data[2] = getHoTTvoltage2();
+    CRSF::SetHeaderAndCrc((uint8_t *)&crsfPT, CRSF_FRAMETYPE_ARDUPILOT_RESP, CRSF_FRAME_SIZE(sizeof(crsf_sensor_CustomTelemMulti_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+
+    // send packet only if min rate timer expired or values have changed
+    if ((now - lastPTSent >= PT_MIN_CRSFRATE) || (lastPTCRC != crsfPT.crc))
+    {
+        lastPTSent = now;
+
+        telemetry.AppendTelemetryPackage((uint8_t *)&crsfPT);
+    }
+
+    lastPTCRC = crsfPT.crc;
 }
 
 // HoTT telemetry data getters
@@ -503,6 +539,60 @@ uint16_t SerialHoTT_TLM::getHoTTMSLaltitude()
     if (device[GPS].present)
     {
         return gps.mslAltitude;
+    }
+
+    return 0;
+}
+
+uint16_t SerialHoTT_TLM::getHoTTtemp()
+{
+    if (device[EAM].present)
+    {
+        return eam.temp1;
+    }
+    else if (device[GAM].present)
+    {
+        return gam.temperature1;
+    }
+    else if (device[ESC].present)
+    {
+        return esc.escTemp;
+    }
+
+    return 0;
+}
+
+uint16_t SerialHoTT_TLM::getHoTTrpm()
+{
+    if (device[EAM].present)
+    {
+        return eam.rpm;
+    }
+    else if (device[GAM].present)
+    {
+        return gam.rpm1;
+    }
+    else if (device[ESC].present)
+    {
+        return esc.rpm;
+    }
+
+    return 0;
+}
+
+uint16_t SerialHoTT_TLM::getHoTTvoltage2()
+{
+    if (device[EAM].present)
+    {
+        return eam.battVoltage1;
+    }
+    else if (device[GAM].present)
+    {
+        return gam.battery1;
+    }
+    else if (device[ESC].present)
+    {
+        return esc.becVoltage;
     }
 
     return 0;

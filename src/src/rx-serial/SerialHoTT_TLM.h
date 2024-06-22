@@ -300,6 +300,7 @@ private:
     void sendCRSFvario(uint32_t now);
     void sendCRSFgps(uint32_t now);
     void sendCRSFbattery(uint32_t now);
+    void sendCRSFpassthrough(uint32_t now);
 
     uint16_t getHoTTvoltage();
     uint16_t getHoTTcurrent();
@@ -313,6 +314,9 @@ private:
     uint16_t getHoTTheading();
     uint8_t getHoTTsatellites();
     uint16_t getHoTTMSLaltitude();
+    uint16_t getHoTTtemp();
+    uint16_t getHoTTrpm();
+    uint16_t getHoTTvoltage2();
 
     uint32_t htobe24(uint32_t val);
 
@@ -352,6 +356,8 @@ private:
     uint32_t lastGPSCRC = 0;
     uint32_t lastBatterySent = 0;
     uint32_t lastBatteryCRC = 0;
+    uint32_t lastPTSent = 0;
+    uint32_t lastPTCRC = 0;
 
     const uint8_t DegMinScale = 100;
     const uint8_t SecScale = 100;
