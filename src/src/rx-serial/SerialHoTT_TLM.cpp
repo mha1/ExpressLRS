@@ -332,7 +332,7 @@ void SerialHoTT_TLM::sendCRSFpassthrough(uint32_t now)
     crsfPT = {0};
     crsfPT.p.sub_type = CRSF_AP_CUSTOM_TELEM_MULTI_PACKET_PASSTHROUGH;
     crsfPT.p.size = PASSTHROUGH_MAX_ITEMS;
-    crsfPT.p.data[0] = getHoTTtemp();
+    crsfPT.p.data[0] = ((int16_t)getHoTTtemp()) - 20;
     crsfPT.p.data[1] = getHoTTrpm();
     crsfPT.p.data[2] = getHoTTvoltage2();
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfPT, CRSF_FRAMETYPE_ARDUPILOT_RESP, CRSF_FRAME_SIZE(sizeof(crsf_sensor_CustomTelemMulti_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
