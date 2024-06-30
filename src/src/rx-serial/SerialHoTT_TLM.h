@@ -317,6 +317,7 @@ private:
     uint16_t getHoTTtemp();
     uint16_t getHoTTrpm();
     uint16_t getHoTTvoltage2();
+    uint16_t getHoTTlowCellVoltage();
 
     uint32_t htobe24(uint32_t val);
 

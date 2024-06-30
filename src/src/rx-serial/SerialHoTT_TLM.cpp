@@ -24,7 +24,7 @@
 #define PT_MIN_CRSFRATE 5000    //
 
 
-#define PASSTHROUGH_MAX_ITEMS 3 // max number of PT tlm items
+#define PASSTHROUGH_MAX_ITEMS 4 // max number of PT tlm items
 
 // CRSF_FRAMETYPE_AP_CUSTOM_TELEM
 typedef struct crsf_sensor_CustomTelemMulti_s
@@ -332,9 +332,13 @@ void SerialHoTT_TLM::sendCRSFpassthrough(uint32_t now)
     crsfPT = {0};
     crsfPT.p.sub_type = CRSF_AP_CUSTOM_TELEM_MULTI_PACKET_PASSTHROUGH;
     crsfPT.p.size = PASSTHROUGH_MAX_ITEMS;
-    crsfPT.p.data[0] = ((int16_t)getHoTTtemp()) - 20;
+
+    uint16_t temp = getHoTTtemp(); 
+
+    crsfPT.p.data[0] = temp < 20 ? 0 : temp - 20;
     crsfPT.p.data[1] = getHoTTrpm();
     crsfPT.p.data[2] = getHoTTvoltage2();
+    crsfPT.p.data[3] = getHoTTlowCellVoltage();
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfPT, CRSF_FRAMETYPE_ARDUPILOT_RESP, CRSF_FRAME_SIZE(sizeof(crsf_sensor_CustomTelemMulti_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
 
     // send packet only if min rate timer expired or values have changed
@@ -593,6 +597,29 @@ uint16_t SerialHoTT_TLM::getHoTTvoltage2()
     else if (device[ESC].present)
     {
         return esc.becVoltage;
+    }
+
+    return 0;
+}
+
+uint16_t SerialHoTT_TLM::getHoTTlowCellVoltage()
+{
+    if (device[GAM].present)
+    {
+        uint8_t *voltages = &gam.voltageCell1;
+        uint8_t lowCellVoltage = 255;
+
+        for (uint8_t i = 0; i < 6; i++) 
+        {
+            uint8_t cellVoltage = voltages[i];
+
+            if(cellVoltage != 0 &&  cellVoltage < lowCellVoltage) 
+            {
+                lowCellVoltage = cellVoltage;
+            }
+        }
+
+        return lowCellVoltage == 255 ? 0 : (uint16_t)lowCellVoltage * 2;
     }
 
     return 0;
