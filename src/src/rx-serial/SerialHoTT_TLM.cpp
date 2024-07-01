@@ -251,6 +251,7 @@ void SerialHoTT_TLM::scheduleCRSFtelemetry(uint32_t now)
         }
     }
 
+    // HoTT GAM, EAM, ESC, GPS -> send passthrough packet
     if (device[GAM].present || device[EAM].present || device[ESC].present || device[GPS].present)
     {
         sendCRSFpassthrough(now);
