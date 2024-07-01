@@ -24,7 +24,7 @@
 #define PT_MIN_CRSFRATE 5000    //
 
 
-#define PASSTHROUGH_MAX_ITEMS 4 // max number of PT tlm items
+#define PASSTHROUGH_MAX_ITEMS 5 // max number of PT tlm items
 
 // CRSF_FRAMETYPE_AP_CUSTOM_TELEM
 typedef struct crsf_sensor_CustomTelemMulti_s
@@ -243,13 +243,17 @@ void SerialHoTT_TLM::scheduleCRSFtelemetry(uint32_t now)
     if (device[GAM].present || device[EAM].present || device[ESC].present)
     {
         sendCRSFbattery(now);
-        sendCRSFpassthrough(now);
 
         // HoTT GAM and EAM but no GPS/Vario or Vario -> send vario packet too
         if ((!device[GPS].present && !device[VARIO].present) && (device[GAM].present || device[EAM].present))
         {
             sendCRSFvario(now);
         }
+    }
+
+    if (device[GAM].present || device[EAM].present || device[ESC].present || device[GPS].present)
+    {
+        sendCRSFpassthrough(now);
     }
 }
 
@@ -262,7 +266,7 @@ void SerialHoTT_TLM::sendCRSFvario(uint32_t now)
     CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t)
     crsfBaro = {0};
     crsfBaro.p.altitude = htobe16(getHoTTaltitude() * 10 + 5000); // Hott 500 = 0m, ELRS 10000 = 0.0m
-    crsfBaro.p.verticalspd = htobe16(getHoTTvv() - 30000);
+    crsfBaro.p.verticalspd = htobe16(getHoTTvv() - HOTT_VSPD_OFFSET);
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
 
     // send packet only if min rate timer expired or values have changed
@@ -335,10 +339,11 @@ void SerialHoTT_TLM::sendCRSFpassthrough(uint32_t now)
 
     uint16_t temp = getHoTTtemp(); 
 
-    crsfPT.p.data[0] = temp < 20 ? 0 : temp - 20;
+    crsfPT.p.data[0] = temp < HOTT_TEMP_OFFSET ? 0 : temp - HOTT_TEMP_OFFSET;
     crsfPT.p.data[1] = getHoTTrpm();
     crsfPT.p.data[2] = getHoTTvoltage2();
     crsfPT.p.data[3] = getHoTTlowCellVoltage();
+    crsfPT.p.data[4] = getHoTTsatFixType();
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfPT, CRSF_FRAMETYPE_ARDUPILOT_RESP, CRSF_FRAME_SIZE(sizeof(crsf_sensor_CustomTelemMulti_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
 
     // send packet only if min rate timer expired or values have changed
@@ -624,6 +629,27 @@ uint16_t SerialHoTT_TLM::getHoTTlowCellVoltage()
 
     return 0;
 }
+
+uint8_t SerialHoTT_TLM::getHoTTsatFixType()
+{
+    if (device[GPS].present)
+    {
+        if (gps.fixChar == '3')
+        {
+            return HOTT_GPS_3D_FIX;
+        }
+
+        if (gps.fixChar == 'D')
+        {
+            return HOTT_GPS_DGPS_FIX;
+        }
+    }
+
+    return HOTT_GPS_NO_FIX;
+}
+
+
+
 
 uint32_t SerialHoTT_TLM::htobe24(uint32_t val)
 {

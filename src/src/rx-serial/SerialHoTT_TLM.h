@@ -31,6 +31,12 @@
 #define SENSOR_ID_VARIO_B 0x89 // device ID binary mode VARIO module
 #define SENSOR_ID_VARIO_T 0x90 // device ID for text mode adressing
 
+#define HOTT_TEMP_OFFSET 20     // HoTT delivers temperature with +20 offset
+#define HOTT_GPS_NO_FIX 0
+#define HOTT_GPS_3D_FIX 3
+#define HOTT_GPS_DGPS_FIX 4
+#define HOTT_VSPD_OFFSET 30000
+
 //
 // GAM data frame data structure
 //
@@ -318,6 +324,7 @@ private:
     uint16_t getHoTTrpm();
     uint16_t getHoTTvoltage2();
     uint16_t getHoTTlowCellVoltage();
+    uint8_t getHoTTsatFixType();
 
     uint32_t htobe24(uint32_t val);
 
