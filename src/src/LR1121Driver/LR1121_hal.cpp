@@ -1,4 +1,4 @@
-#ifndef UNIT_TEST
+#if !defined(UNIT_TEST) && defined(RADIO_LR1121)
 
 #include "LR1121_hal.h"
 #include "LR1121_Regs.h"

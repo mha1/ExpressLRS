@@ -1,4 +1,4 @@
-#ifndef UNIT_TEST
+#if !defined(UNIT_TEST) && defined(RADIO_SX127X)
 
 #include "SX127xHal.h"
 #include "SX127xRegs.h"
