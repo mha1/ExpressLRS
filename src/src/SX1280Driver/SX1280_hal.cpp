@@ -16,8 +16,7 @@ Maintainer: Miguel Luis, Gregory Cristian and Matthieu Verdy
 Modified and adapted by Alessandro Carcione for ELRS project
 */
 
-#if !defined(UNIT_TEST) && defined(RADIO_SX128X)
-
+#ifndef UNIT_TEST
 #include "SX1280_Regs.h"
 #include "SX1280_hal.h"
 #include <SPIEx.h>

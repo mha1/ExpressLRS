@@ -1,5 +1,3 @@
-#if defined(RADIO_SX127X)
-
 #include "SX127x.h"
 #include "logging.h"
 #include "RFAMP_hal.h"
@@ -831,5 +829,3 @@ void ICACHE_RAM_ATTR SX127xDriver::IsrCallback(SX12XX_Radio_Number_t radioNumber
 //   ClearIrqFlags();
 //   return (CHANNEL_FREE);
 // }
-
-#endif

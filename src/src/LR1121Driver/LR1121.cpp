@@ -1,5 +1,3 @@
-#if defined(RADIO_LR1121)
-
 #include "LR1121_Regs.h"
 #include "LR1121_hal.h"
 #include "LR1121.h"
@@ -866,5 +864,3 @@ void ICACHE_RAM_ATTR LR1121Driver::IsrCallback(SX12XX_Radio_Number_t radioNumber
 #endif
     }
 }
-
-#endif

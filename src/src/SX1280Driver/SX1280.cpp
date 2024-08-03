@@ -1,5 +1,3 @@
-#if defined(RADIO_SX128X)
-
 #include "SX1280_Regs.h"
 #include "SX1280_hal.h"
 #include "SX1280.h"
@@ -766,5 +764,3 @@ void ICACHE_RAM_ATTR SX1280Driver::IsrCallback(SX12XX_Radio_Number_t radioNumber
     }
     instance->ClearIrqStatus(SX1280_IRQ_RADIO_ALL, irqClearRadio);
 }
-
-#endif
