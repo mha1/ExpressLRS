@@ -16,7 +16,7 @@
 #define BUTTON_CHANGED      bit(6)
 #define ALL_CHANGED         (MODEL_CHANGED | VTX_CHANGED | MAIN_CHANGED | FAN_CHANGED | MOTION_CHANGED | BUTTON_CHANGED)
 
-// Really awful but safe(?) type punning of model_config_t/v6_model_config_t to and from uint32_t
+// Really awful but safe(?) type punning of model_config_t/v7_model_config_t from and to uint64_t
 template<class T> static const void U64_to_Model(uint64_t const u64, T * const model)
 {
     union {
@@ -43,6 +43,20 @@ template<class T> static const uint64_t Model_to_U64(T const * const model)
 
     converter.val.model = *model;
     return converter.u64;
+}
+
+// Really awful but safe(?) type punning of model_config_t/v6_model_config_t to and from uint32_t
+template<class T> static const void U32_to_Model(uint32_t const u32, T * const model)
+{
+    union {
+        union {
+            T model;
+            uint8_t padding[sizeof(uint32_t)-sizeof(T)];
+        } val;
+        uint32_t u32;
+    } converter = { .u32 = u32 };
+
+    *model = converter.val.model;
 }
 
 static uint8_t RateV6toV7(uint8_t rateV6)
@@ -185,20 +199,28 @@ void TxConfig::Load()
 
     for(unsigned i=0; i<CONFIG_TX_MODEL_CNT; i++)
     {
-        uint64_t value;
         char model[10] = "model";
         itoa(i, model+5, 10);
-        if (nvs_get_u64(handle, model, &value) == ESP_OK)
+        
+        if (version >= 7)
         {
-            if (version >= 7)
+            uint64_t value;
+
+            if (nvs_get_u64(handle, model, &value) == ESP_OK)
             {
                 U64_to_Model(value, &m_config.model_config[i]);
             }
-            else
+        }
+        else
+        {
+            // Upgrade v6 to v7 directly writing to nvs instead of calling Commit() over and over
+            uint32_t value;
+
+            if (nvs_get_u32(handle, model, &value) == ESP_OK)
             {
-                // Upgrade v6 to v7 directly writing to nvs instead of calling Commit() over and over
                 v6_model_config_t v6model;
-                U64_to_Model(value, &v6model);
+                U32_to_Model(value, &v6model);
+
                 model_config_t * const newModel = &m_config.model_config[i];
                 ModelV6toV7(&v6model, newModel);
                 nvs_set_u64(handle, model, Model_to_U64(newModel));
