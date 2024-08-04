@@ -5,10 +5,9 @@
 #include "crsf_protocol.h"
 #ifndef TARGET_NATIVE
 #include "HardwareSerial.h"
+#include "config.h"
 #endif
 #include "common.h"
-
-#include "config.h"
 
 #ifdef PLATFORM_ESP32
 #include "driver/uart.h"
