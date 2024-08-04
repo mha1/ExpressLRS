@@ -22,7 +22,11 @@ public:
     void End() override;
 
 #ifdef CRSF_TX_MODULE
-    bool IsArmed() override { return CRSF_to_BIT(ChannelData[config.GetArmChannel()-1]); } // AUX1
+    #ifdef TARGET_NATIVE
+        bool IsArmed() override { return CRSF_to_BIT(ChannelData[4]); } // AUX1
+    #else
+        bool IsArmed() override { return CRSF_to_BIT(ChannelData[config.GetArmChannel()-1]); }
+    #endif
     void handleInput() override;
     void handleOutput(int receivedBytes);
 
