@@ -17,32 +17,32 @@
 #define ALL_CHANGED         (MODEL_CHANGED | VTX_CHANGED | MAIN_CHANGED | FAN_CHANGED | MOTION_CHANGED | BUTTON_CHANGED)
 
 // Really awful but safe(?) type punning of model_config_t/v6_model_config_t to and from uint32_t
-template<class T> static const void U32_to_Model(uint32_t const u32, T * const model)
+template<class T> static const void U64_to_Model(uint64_t const u64, T * const model)
 {
     union {
         union {
             T model;
-            uint8_t padding[sizeof(uint32_t)-sizeof(T)];
+            uint8_t padding[sizeof(uint64_t)-sizeof(T)];
         } val;
-        uint32_t u32;
-    } converter = { .u32 = u32 };
+        uint64_t u64;
+    } converter = { .u64 = u64 };
 
     *model = converter.val.model;
 }
 
-template<class T> static const uint32_t Model_to_U32(T const * const model)
+template<class T> static const uint64_t Model_to_U64(T const * const model)
 {
     // clear the entire union because the assignment will only fill sizeof(T)
     union {
         union {
             T model;
-            uint8_t padding[sizeof(uint32_t)-sizeof(T)];
+            uint8_t padding[sizeof(uint64_t)-sizeof(T)];
         } val;
-        uint32_t u32;
+        uint64_t u64;
     } converter = { 0 };
 
     converter.val.model = *model;
-    return converter.u32;
+    return converter.u64;
 }
 
 static uint8_t RateV6toV7(uint8_t rateV6)
@@ -185,22 +185,23 @@ void TxConfig::Load()
 
     for(unsigned i=0; i<CONFIG_TX_MODEL_CNT; i++)
     {
+        uint64_t value;
         char model[10] = "model";
         itoa(i, model+5, 10);
-        if (nvs_get_u32(handle, model, &value) == ESP_OK)
+        if (nvs_get_u64(handle, model, &value) == ESP_OK)
         {
             if (version >= 7)
             {
-                U32_to_Model(value, &m_config.model_config[i]);
+                U64_to_Model(value, &m_config.model_config[i]);
             }
             else
             {
                 // Upgrade v6 to v7 directly writing to nvs instead of calling Commit() over and over
                 v6_model_config_t v6model;
-                U32_to_Model(value, &v6model);
+                U64_to_Model(value, &v6model);
                 model_config_t * const newModel = &m_config.model_config[i];
                 ModelV6toV7(&v6model, newModel);
-                nvs_set_u32(handle, model, Model_to_U32(newModel));
+                nvs_set_u64(handle, model, Model_to_U64(newModel));
             }
         }
     } // for each model
@@ -310,10 +311,10 @@ TxConfig::Commit()
     // Write parts to NVS
     if (m_modified & MODEL_CHANGED)
     {
-        uint32_t value = Model_to_U32(m_model);
+        uint64_t value = Model_to_U64(m_model);
         char model[10] = "model";
         itoa(m_modelId, model+5, 10);
-        nvs_set_u32(handle, model, value);
+        nvs_set_u64(handle, model, value);
     }
     if (m_modified & VTX_CHANGED)
     {
@@ -609,6 +610,15 @@ TxConfig::SetPTREnableChannel(uint8_t ptrEnableChannel)
 {
     if (ptrEnableChannel != m_model->ptrEnableChannel) {
         m_model->ptrEnableChannel = ptrEnableChannel;
+        m_modified |= MODEL_CHANGED;
+    }
+}
+
+void
+TxConfig::SetArmChannel(uint8_t arm_channel)
+{
+    if (arm_channel != m_model->arm_channel) {
+        m_model->arm_channel = arm_channel;
         m_modified |= MODEL_CHANGED;
     }
 }

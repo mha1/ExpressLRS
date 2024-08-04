@@ -6,6 +6,7 @@
 #include "common.h"
 #include "crsf_protocol.h"
 #include "logging.h"
+#include "config.h"
 
 #include <driver/rmt.h>
 
@@ -38,7 +39,7 @@ void PPMHandset::End()
 
 bool PPMHandset::IsArmed()
 {
-    bool maybeArmed = numChannels < 5 || CRSF_to_BIT(ChannelData[4]);
+    bool maybeArmed = numChannels < 5 || CRSF_to_BIT(ChannelData[config.GetArmChannel()-1]);
     return maybeArmed && lastPPM;
 }
 

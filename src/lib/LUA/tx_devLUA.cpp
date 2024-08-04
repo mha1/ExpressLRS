@@ -53,6 +53,7 @@ static const char luastrHeadTrackingEnable[] = "Off;On;" STR_LUA_ALLAUX_UPDOWN;
 static const char luastrHeadTrackingStart[] = STR_LUA_ALLAUX;
 static const char luastrOffOn[] = "Off;On";
 static char luastrPacketRates[] = STR_LUA_PACKETRATES;
+static const char luaArmChannels[] = "Default(5);1;2;3;4;5;6;7;8;9;10;11;12;13;14;15;16";
 
 #define HAS_RADIO (GPIO_PIN_SCK != UNDEF_PIN)
 
@@ -136,6 +137,12 @@ static struct luaItem_selection luaModelMatch = {
     luastrOffOn,
     modelMatchUnit
 };
+
+static struct luaItem_selection luaArmChannel = {
+    {"Arm channel", CRSF_TEXT_SELECTION},
+    4, // value
+    luaArmChannels,
+    STR_EMPTYSPACE};
 
 static struct luaItem_command luaBind = {
     {"Bind", CRSF_COMMAND},
@@ -730,6 +737,10 @@ static void registerLuaParameters()
         }
         luadevUpdateModelID();
       });
+      
+      registerLUAParameter(&luaArmChannel, [](struct luaPropertiesCommon *item, uint8_t arg) {
+        config.SetArmChannel(arg);
+      });
     }
 
     // POWER folder
@@ -892,6 +903,7 @@ static int event()
   setLuaTextSelectionValue(&luaLinkMode, config.GetLinkMode());
   luadevUpdateModelID();
   setLuaTextSelectionValue(&luaModelMatch, (uint8_t)config.GetModelMatch());
+  setLuaTextSelectionValue(&luaArmChannel, (uint8_t)config.GetArmChannel());
   setLuaTextSelectionValue(&luaPower, config.GetPower() - MinPower);
   if (GPIO_PIN_FAN_EN != UNDEF_PIN || GPIO_PIN_FAN_PWM != UNDEF_PIN)
   {

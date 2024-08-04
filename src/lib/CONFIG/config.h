@@ -45,17 +45,27 @@ typedef enum {
 } headTrackingEnable_t;
 
 typedef struct {
-    uint32_t    rate:4,
+    uint64_t    rate:4,
                 tlm:4,
+
                 power:3,
                 switchMode:2,
                 boostChannel:3, // dynamic power boost AUX channel
+
                 dynamicPower:1,
                 modelMatch:1,
                 txAntenna:2,    // FUTURE: Which TX antenna to use, 0=Auto
                 ptrStartChannel:4,
+
                 ptrEnableChannel:5,
-                linkMode:3;
+                linkMode:3,
+
+                arm_channel:5,
+                unused1:3,
+
+                unused2:8,
+                unused3:8,
+                unused4:8;
 } model_config_t;
 
 typedef struct {
@@ -128,6 +138,7 @@ public:
     model_config_t const &GetModelConfig(uint8_t model) const { return m_config.model_config[model]; }
     uint8_t GetPTRStartChannel() const { return m_model->ptrStartChannel; }
     uint8_t GetPTREnableChannel() const { return m_model->ptrEnableChannel; }
+    uint8_t GetArmChannel() const { return m_model->arm_channel == 0 ? 5 : m_model->arm_channel; }
 
     // Setters
     void SetRate(uint8_t rate);
@@ -156,6 +167,7 @@ public:
     void SetBackpackTlmEnabled(bool enabled);
     void SetPTRStartChannel(uint8_t ptrStartChannel);
     void SetPTREnableChannel(uint8_t ptrEnableChannel);
+    void SetArmChannel(uint8_t arm_channel);
 
     // State setters
     bool SetModelId(uint8_t modelId);

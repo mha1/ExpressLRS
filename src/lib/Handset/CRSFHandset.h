@@ -8,6 +8,8 @@
 #endif
 #include "common.h"
 
+#include "config.h"
+
 #ifdef PLATFORM_ESP32
 #include "driver/uart.h"
 #endif
@@ -21,7 +23,7 @@ public:
     void End() override;
 
 #ifdef CRSF_TX_MODULE
-    bool IsArmed() override { return CRSF_to_BIT(ChannelData[4]); } // AUX1
+    bool IsArmed() override { return CRSF_to_BIT(ChannelData[config.GetArmChannel()-1]); } // AUX1
     void handleInput() override;
     void handleOutput(int receivedBytes);
 

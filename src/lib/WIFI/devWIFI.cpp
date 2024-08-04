@@ -354,6 +354,7 @@ static void GetConfiguration(AsyncWebServerRequest *request)
       modelJson["power"]["dynamic-power"] = modelConfig.dynamicPower;
       modelJson["power"]["boost-channel"] = modelConfig.boostChannel;
       modelJson["model-match"] = modelConfig.modelMatch;
+      modelJson["arm-channel"] = modelConfig.arm_channel;
       modelJson["tx-antenna"] = modelConfig.txAntenna;
     }
   }
@@ -472,6 +473,7 @@ static void ImportConfiguration(AsyncWebServerRequest *request, JsonVariant &jso
         if (modelJson["power"].containsKey("boost-channel")) config.SetBoostChannel(modelJson["power"]["boost-channel"]);
       }
       if (modelJson.containsKey("model-match")) config.SetModelMatch(modelJson["model-match"]);
+      if (modelJson.containsKey("arm-channel")) config.SetArmChannel(modelJson["arm-channel"]);
       // if (modelJson.containsKey("tx-antenna")) config.SetTxAntenna(modelJson["tx-antenna"]);
       // have to commmit after each model is updated
       config.Commit();
