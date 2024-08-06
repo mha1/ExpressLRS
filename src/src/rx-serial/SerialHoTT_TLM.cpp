@@ -24,14 +24,14 @@
 #define PT_MIN_CRSFRATE 5000    //
 
 
-#define PASSTHROUGH_MAX_ITEMS 5 // max number of PT tlm items
+#define PASSTHROUGH_MAX_ITEMS 6 // max number of PT tlm items
 
 // CRSF_FRAMETYPE_AP_CUSTOM_TELEM
 typedef struct crsf_sensor_CustomTelemMulti_s
 {
     uint8_t sub_type;
     uint8_t size;
-    uint16_t data[PASSTHROUGH_MAX_ITEMS];
+    uint16_t PTdata[PASSTHROUGH_MAX_ITEMS];
 } PACKED crsf_sensor_CustomTelemMulti_t;
 
 typedef struct crsf_sensor_gps_s
@@ -338,13 +338,13 @@ void SerialHoTT_TLM::sendCRSFpassthrough(uint32_t now)
     crsfPT.p.sub_type = CRSF_AP_CUSTOM_TELEM_MULTI_PACKET_PASSTHROUGH;
     crsfPT.p.size = PASSTHROUGH_MAX_ITEMS;
 
-    uint16_t temp = getHoTTtemp(); 
+    crsfPT.p.PTdata[0] = getHoTTtemp1() - HOTT_TEMP_OFFSET;
+    crsfPT.p.PTdata[1] = getHoTTrpm();
+    crsfPT.p.PTdata[2] = getHoTTvoltage2();
+    crsfPT.p.PTdata[3] = getHoTTlowCellVoltage();
+    crsfPT.p.PTdata[4] = getHoTTsatFixType();
+    crsfPT.p.PTdata[5] = getHoTTtemp2() - HOTT_TEMP_OFFSET;
 
-    crsfPT.p.data[0] = temp < HOTT_TEMP_OFFSET ? 0 : temp - HOTT_TEMP_OFFSET;
-    crsfPT.p.data[1] = getHoTTrpm();
-    crsfPT.p.data[2] = getHoTTvoltage2();
-    crsfPT.p.data[3] = getHoTTlowCellVoltage();
-    crsfPT.p.data[4] = getHoTTsatFixType();
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfPT, CRSF_FRAMETYPE_ARDUPILOT_RESP, CRSF_FRAME_SIZE(sizeof(crsf_sensor_CustomTelemMulti_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
 
     // send packet only if min rate timer expired or values have changed
@@ -554,7 +554,7 @@ uint16_t SerialHoTT_TLM::getHoTTMSLaltitude()
     return 0;
 }
 
-uint16_t SerialHoTT_TLM::getHoTTtemp()
+uint16_t SerialHoTT_TLM::getHoTTtemp1()
 {
     if (device[EAM].present)
     {
@@ -567,6 +567,24 @@ uint16_t SerialHoTT_TLM::getHoTTtemp()
     else if (device[ESC].present)
     {
         return esc.escTemp;
+    }
+
+    return 0;
+}
+
+uint16_t SerialHoTT_TLM::getHoTTtemp2()
+{
+    if (device[EAM].present)
+    {
+        return eam.temp2;
+    }
+    else if (device[GAM].present)
+    {
+        return gam.temperature2;
+    }
+    else if (device[ESC].present)
+    {
+        return esc.becTemp;
     }
 
     return 0;

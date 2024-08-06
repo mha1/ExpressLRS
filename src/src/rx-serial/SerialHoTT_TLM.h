@@ -320,7 +320,8 @@ private:
     uint16_t getHoTTheading();
     uint8_t getHoTTsatellites();
     uint16_t getHoTTMSLaltitude();
-    uint16_t getHoTTtemp();
+    uint16_t getHoTTtemp1();
+    uint16_t getHoTTtemp2();
     uint16_t getHoTTrpm();
     uint16_t getHoTTvoltage2();
     uint16_t getHoTTlowCellVoltage();
