@@ -21,7 +21,18 @@
                                 // be expected update rate will by about 150ms due
                                 // to HoTT bus speed if only a HoTT Vario is connected and
                                 // values change every HoTT bus poll cycle.
+#define PT_MIN_CRSFRATE 5000    //
 
+
+#define PASSTHROUGH_MAX_ITEMS 6 // max number of PT tlm items
+
+// CRSF_FRAMETYPE_AP_CUSTOM_TELEM
+typedef struct crsf_sensor_CustomTelemMulti_s
+{
+    uint8_t sub_type;
+    uint8_t size;
+    uint16_t PTdata[PASSTHROUGH_MAX_ITEMS];
+} PACKED crsf_sensor_CustomTelemMulti_t;
 
 extern Telemetry telemetry;
 
@@ -229,6 +240,12 @@ void SerialHoTT_TLM::scheduleCRSFtelemetry(uint32_t now)
             sendCRSFvario(now);
         }
     }
+
+    // HoTT GAM, EAM, ESC, GPS -> send passthrough packet
+    if (device[GAM].present || device[EAM].present || device[ESC].present || device[GPS].present)
+    {
+        sendCRSFpassthrough(now);
+    }
 }
 
 void SerialHoTT_TLM::sendCRSFvario(uint32_t now)
@@ -240,7 +257,7 @@ void SerialHoTT_TLM::sendCRSFvario(uint32_t now)
     CRSF_MK_FRAME_T(crsf_sensor_baro_vario_t)
     crsfBaro = {0};
     crsfBaro.p.altitude = htobe16(getHoTTaltitude() * 10 + 5000); // Hott 500 = 0m, ELRS 10000 = 0.0m
-    crsfBaro.p.verticalspd = htobe16(getHoTTvv() - 30000);
+    crsfBaro.p.verticalspd = htobe16(getHoTTvv() - HOTT_VSPD_OFFSET);
     CRSF::SetHeaderAndCrc((uint8_t *)&crsfBaro, CRSF_FRAMETYPE_BARO_ALTITUDE, CRSF_FRAME_SIZE(sizeof(crsf_sensor_baro_vario_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
 
     // send packet only if min rate timer expired or values have changed
@@ -301,6 +318,34 @@ void SerialHoTT_TLM::sendCRSFbattery(uint32_t now)
     }
 
     lastBatteryCRC = crsfBatt.crc;
+}
+
+void SerialHoTT_TLM::sendCRSFpassthrough(uint32_t now)
+{
+    // prepare CRSF telemetry packet
+    CRSF_MK_FRAME_T(crsf_sensor_CustomTelemMulti_t)
+    crsfPT = {0};
+    crsfPT.p.sub_type = CRSF_AP_CUSTOM_TELEM_MULTI_PACKET_PASSTHROUGH;
+    crsfPT.p.size = PASSTHROUGH_MAX_ITEMS;
+
+    crsfPT.p.PTdata[0] = getHoTTtemp1() - HOTT_TEMP_OFFSET;
+    crsfPT.p.PTdata[1] = getHoTTrpm();
+    crsfPT.p.PTdata[2] = getHoTTvoltage2();
+    crsfPT.p.PTdata[3] = getHoTTlowCellVoltage();
+    crsfPT.p.PTdata[4] = getHoTTsatFixType();
+    crsfPT.p.PTdata[5] = getHoTTtemp2() - HOTT_TEMP_OFFSET;
+
+    CRSF::SetHeaderAndCrc((uint8_t *)&crsfPT, CRSF_FRAMETYPE_ARDUPILOT_RESP, CRSF_FRAME_SIZE(sizeof(crsf_sensor_CustomTelemMulti_t)), CRSF_ADDRESS_CRSF_TRANSMITTER);
+
+    // send packet only if min rate timer expired or values have changed
+    if ((now - lastPTSent >= PT_MIN_CRSFRATE) || (lastPTCRC != crsfPT.crc))
+    {
+        lastPTSent = now;
+
+        telemetry.AppendTelemetryPackage((uint8_t *)&crsfPT);
+    }
+
+    lastPTCRC = crsfPT.crc;
 }
 
 // HoTT telemetry data getters
@@ -498,6 +543,122 @@ uint16_t SerialHoTT_TLM::getHoTTMSLaltitude()
 
     return 0;
 }
+
+uint16_t SerialHoTT_TLM::getHoTTtemp1()
+{
+    if (device[EAM].present)
+    {
+        return eam.temp1;
+    }
+    else if (device[GAM].present)
+    {
+        return gam.temperature1;
+    }
+    else if (device[ESC].present)
+    {
+        return esc.escTemp;
+    }
+
+    return 0;
+}
+
+uint16_t SerialHoTT_TLM::getHoTTtemp2()
+{
+    if (device[EAM].present)
+    {
+        return eam.temp2;
+    }
+    else if (device[GAM].present)
+    {
+        return gam.temperature2;
+    }
+    else if (device[ESC].present)
+    {
+        return esc.becTemp;
+    }
+
+    return 0;
+}
+
+uint16_t SerialHoTT_TLM::getHoTTrpm()
+{
+    if (device[EAM].present)
+    {
+        return eam.rpm;
+    }
+    else if (device[GAM].present)
+    {
+        return gam.rpm1;
+    }
+    else if (device[ESC].present)
+    {
+        return esc.rpm;
+    }
+
+    return 0;
+}
+
+uint16_t SerialHoTT_TLM::getHoTTvoltage2()
+{
+    if (device[EAM].present)
+    {
+        return eam.battVoltage1;
+    }
+    else if (device[GAM].present)
+    {
+        return gam.battery1;
+    }
+    else if (device[ESC].present)
+    {
+        return esc.becVoltage;
+    }
+
+    return 0;
+}
+
+uint16_t SerialHoTT_TLM::getHoTTlowCellVoltage()
+{
+    if (device[GAM].present)
+    {
+        uint8_t *voltages = &gam.voltageCell1;
+        uint8_t lowCellVoltage = 255;
+
+        for (uint8_t i = 0; i < 6; i++) 
+        {
+            uint8_t cellVoltage = voltages[i];
+
+            if(cellVoltage != 0 &&  cellVoltage < lowCellVoltage) 
+            {
+                lowCellVoltage = cellVoltage;
+            }
+        }
+
+        return lowCellVoltage == 255 ? 0 : (uint16_t)lowCellVoltage * 2;
+    }
+
+    return 0;
+}
+
+uint8_t SerialHoTT_TLM::getHoTTsatFixType()
+{
+    if (device[GPS].present)
+    {
+        if (gps.fixChar == '3')
+        {
+            return HOTT_GPS_3D_FIX;
+        }
+
+        if (gps.fixChar == 'D')
+        {
+            return HOTT_GPS_DGPS_FIX;
+        }
+    }
+
+    return HOTT_GPS_NO_FIX;
+}
+
+
+
 
 uint32_t SerialHoTT_TLM::htobe24(uint32_t val)
 {
