@@ -239,46 +239,152 @@ void CRSFHandset::sendSyncPacketToTX() // in values in us.
     }
 }
 
-void CRSFHandset::RcPacketToChannelsData(uint8_t packetType) // data is packed as 11 bits per channel
+#define CRSF_SUBSET_RC_STARTING_CHANNEL_BITS        5
+#define CRSF_SUBSET_RC_STARTING_CHANNEL_MASK        0x1F
+#define CRSF_SUBSET_RC_RES_CONFIGURATION_BITS       2
+#define CRSF_SUBSET_RC_RES_CONFIGURATION_MASK       0x03
+#define CRSF_SUBSET_RC_EXT_DATA_CONFIGURATION_BITS  1
+#define CRSF_SUBSET_RC_EXT_DATA_CONFIGURATION_MASK  0x01
+
+#define CRSF_RC_CHANNEL_SCALE_LEGACY                0.62477120195241f
+#define CRSF_SUBSET_RC_RES_CONF_10B                 0
+#define CRSF_SUBSET_RC_RES_BITS_10B                 10
+#define CRSF_SUBSET_RC_RES_MASK_10B                 0x03FF
+#define CRSF_SUBSET_RC_CHANNEL_SCALE_10B            1.0f
+#define CRSF_SUBSET_RC_RES_CONF_11B                 1
+#define CRSF_SUBSET_RC_RES_BITS_11B                 11
+#define CRSF_SUBSET_RC_RES_MASK_11B                 0x07FF
+#define CRSF_SUBSET_RC_CHANNEL_SCALE_11B            0.5f
+#define CRSF_SUBSET_RC_RES_CONF_12B                 2
+#define CRSF_SUBSET_RC_RES_BITS_12B                 12
+#define CRSF_SUBSET_RC_RES_MASK_12B                 0x0FFF
+#define CRSF_SUBSET_RC_CHANNEL_SCALE_12B            0.25f
+#define CRSF_SUBSET_RC_RES_CONF_13B                 3
+#define CRSF_SUBSET_RC_RES_BITS_13B                 13
+#define CRSF_SUBSET_RC_RES_MASK_13B                 0x1FFF
+#define CRSF_SUBSET_RC_CHANNEL_SCALE_13B            0.125f
+
+void CRSFHandset::RcPacketToChannelsData(uint8_t packetType)
 {
-    auto payload = (uint8_t const * const)&inBuffer.asRCPacket_t.channels;
-    constexpr unsigned srcBits = 11;
-    constexpr unsigned dstBits = 11;
-    constexpr unsigned inputChannelMask = (1 << srcBits) - 1;
-    constexpr unsigned precisionShift = dstBits - srcBits;
+    // unpack the RC channels
+    if (packetType == CRSF_FRAMETYPE_RC_CHANNELS_PACKED) {
+        // use ordinary RC frame structure (0x16)
 
-    // code from BetaFlight rx/crsf.cpp / bitpacker_unpack
-    uint8_t bitsMerged = 0;
-    uint32_t readValue = 0;
-    unsigned readByteIndex = 0;
-    for (uint32_t & n : ChannelData)
-    {
-        while (bitsMerged < srcBits)
-        {
-            uint8_t readByte = payload[readByteIndex++];
-            readValue |= ((uint32_t) readByte) << bitsMerged;
-            bitsMerged += 8;
+        // get channel data
+        const crsf_channels_t* const rcChannels = &inBuffer.asRCPacket_t.channels;
+
+        //channelScale = CRSF_RC_CHANNEL_SCALE_LEGACY;
+
+        ChannelData[0] = rcChannels->ch0;
+        ChannelData[1] = rcChannels->ch1;
+        ChannelData[2] = rcChannels->ch2;
+        ChannelData[3] = rcChannels->ch3;
+        ChannelData[4] = rcChannels->ch4;
+        ChannelData[5] = rcChannels->ch5;
+        ChannelData[6] = rcChannels->ch6;
+        ChannelData[7] = rcChannels->ch7;
+        ChannelData[8] = rcChannels->ch8;
+        ChannelData[9] = rcChannels->ch9;
+        ChannelData[10] = rcChannels->ch10;
+        ChannelData[11] = rcChannels->ch11;
+        ChannelData[12] = rcChannels->ch12;
+        ChannelData[13] = rcChannels->ch13;
+        ChannelData[14] = rcChannels->ch14;
+        ChannelData[15] = rcChannels->ch15;
+
+        // set the armed state
+        armCmd = CRSF_to_BIT(ChannelData[4]);
+    } else {
+        // use subset RC frame structure (0x17)
+
+        // get message
+        const uint8_t *payload = inBuffer.asUint8_t;
+
+        // start with index of config byte
+        uint8_t readByteIndex = sizeof(crsf_header_t);
+
+        // get the configuration byte
+        uint8_t configByte = payload[readByteIndex++];
+
+        // get the channel number of start channel
+        uint8_t startChannel = configByte & CRSF_SUBSET_RC_STARTING_CHANNEL_MASK;
+        configByte >>= CRSF_SUBSET_RC_STARTING_CHANNEL_BITS;
+
+        // get the channel resolution settings
+        uint8_t channelRes = configByte & CRSF_SUBSET_RC_RES_CONFIGURATION_MASK;
+        configByte >>= CRSF_SUBSET_RC_RES_CONFIGURATION_BITS;
+
+        // get the extended data available flag
+        bool extDataAvailable = configByte & CRSF_SUBSET_RC_EXT_DATA_CONFIGURATION_MASK;
+        uint8_t adjustForExtData = extDataAvailable ? 2 : 0;
+
+        // work out the channel resolution
+        uint8_t channelBits;
+        uint16_t channelMask;
+
+        switch (channelRes) {
+            case CRSF_SUBSET_RC_RES_CONF_10B:
+                channelBits = CRSF_SUBSET_RC_RES_BITS_10B;
+                channelMask = CRSF_SUBSET_RC_RES_MASK_10B;
+                //channelScale = CRSF_SUBSET_RC_CHANNEL_SCALE_10B;
+                break;
+            default:
+            case CRSF_SUBSET_RC_RES_CONF_11B:
+                channelBits = CRSF_SUBSET_RC_RES_BITS_11B;
+                channelMask = CRSF_SUBSET_RC_RES_MASK_11B;
+                //channelScale = CRSF_SUBSET_RC_CHANNEL_SCALE_11B;
+                break;
+            case CRSF_SUBSET_RC_RES_CONF_12B:
+                channelBits = CRSF_SUBSET_RC_RES_BITS_12B;
+                channelMask = CRSF_SUBSET_RC_RES_MASK_12B;
+                //channelScale = CRSF_SUBSET_RC_CHANNEL_SCALE_12B;
+                break;
+            case CRSF_SUBSET_RC_RES_CONF_13B:
+                channelBits = CRSF_SUBSET_RC_RES_BITS_13B;
+                channelMask = CRSF_SUBSET_RC_RES_MASK_13B;
+                //channelScale = CRSF_SUBSET_RC_CHANNEL_SCALE_13B;
+                break;
         }
-        //printf("rv=%x(%x) bm=%u\n", readValue, (readValue & inputChannelMask), bitsMerged);
-        n = (readValue & inputChannelMask) << precisionShift;
-        readValue >>= srcBits;
-        bitsMerged -= srcBits;
-    }
 
-    armCmd = packetType == CRSF_FRAMETYPE_RC_CHANNELS_PACKED_EXT ? payload[readByteIndex] == 1 : CRSF_to_BIT(ChannelData[4]);
+        // calculate the number of channels received
+        uint8_t numOfChannels = ((payload[1] - 3 - adjustForExtData) * 8) / channelBits;
+
+/*
+        for(uint8_t i = 0; i < 28; i++)
+            DBG("%d ", payload[i]);
+        DBGLN("");
+        DBGLN("len %d start %d num %d ext %d", payload[1]-5, startChannel, numOfChannels, extDataAvailable);
+*/
+        // unpack the channel data
+        uint8_t bitsMerged = 0;
+        uint32_t readValue = 0;
+
+        for (uint8_t n = 0; n < numOfChannels; n++) {
+            while (bitsMerged < channelBits) {
+                uint8_t readByte = payload[readByteIndex++];
+                readValue |= ((uint32_t) readByte) << bitsMerged;
+                bitsMerged += 8;
+            }
+
+            ChannelData[startChannel + n] = readValue & channelMask;
+            readValue >>= channelBits;
+            bitsMerged -= channelBits;
+        }
+
+        // set the armed state based on SF Arm (Function mode) or channel 5 (Channel mode) 
+        armCmd = extDataAvailable ? payload[readByteIndex] == 1 : CRSF_to_BIT(ChannelData[4]);
+    }
 
     #if defined(PLATFORM_ESP32)
         // monitoring arming state
-
         static bool lastArmCmd = false;
 
         if (lastArmCmd != armCmd) {
             devicesTriggerEvent();
             lastArmCmd = armCmd;
         }
-    #endif
+    #endif 
 }
-
 
 bool CRSFHandset::processInternalCrsfPackage(uint8_t *package)
 {
@@ -338,7 +444,7 @@ bool CRSFHandset::ProcessPacket()
     const uint8_t packetType = inBuffer.asRCPacket_t.header.type;
     uint8_t *SerialInBuffer = inBuffer.asUint8_t;
 
-    if (packetType == CRSF_FRAMETYPE_RC_CHANNELS_PACKED || packetType == CRSF_FRAMETYPE_RC_CHANNELS_PACKED_EXT)
+    if (packetType == CRSF_FRAMETYPE_RC_CHANNELS_PACKED || packetType == CRSF_FRAMETYPE_RC_SUBSET_CHANNELS_PACKED)
     {
         RCdataLastRecv = micros();
         RcPacketToChannelsData(packetType);
