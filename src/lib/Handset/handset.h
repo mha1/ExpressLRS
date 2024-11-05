@@ -117,6 +117,6 @@ protected:
     int32_t RequestedRCpacketInterval = 5000; // default to 200hz as per 'normal'
 };
 
-#if defined(TARGET_TX) || defined (UNIT_TEST)
+#if defined(TARGET_TX)
 extern Handset *handset;
 #endif
