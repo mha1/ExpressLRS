@@ -2,6 +2,8 @@
 
 #include "targets.h"
 
+#if not defined(UNIT_TEST)
+
 /**
  * @brief Abstract class that is extended to provide an interface to a handset.
  *
@@ -116,6 +118,21 @@ protected:
     volatile uint32_t RCdataLastRecv = 0;
     int32_t RequestedRCpacketInterval = 5000; // default to 200hz as per 'normal'
 };
+#else
+//
+// for unit testing
+//
+class Handset
+{
+public:
+    Handset() {}
+
+    bool IsArmed() { return CRSF_to_BIT(ChannelData[4]); }
+};
+
+Handset *handset = new Handset();
+
+#endif
 
 #ifdef TARGET_TX
 extern Handset *handset;
