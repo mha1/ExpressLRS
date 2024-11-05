@@ -23,6 +23,16 @@ CRSF crsf;  // need an instance to provide the fields used by the code under tes
 uint32_t ChannelData[CRSF_NUM_CHANNELS];      // Current state of channels, CRSF format
 uint8_t UID[6] = {1,2,3,4,5,6};
 
+class Handset
+{
+public:
+    Handset() {}
+
+    bool IsArmed() { return CRSF_to_BIT(ChannelData[4]); }
+};
+
+Handset *handset = new Handset();
+
 void test_crsf_endpoints()
 {
     // Validate 988us and 2012us convert to approprate CRSF values. Spoiler: They don't
