@@ -113,7 +113,7 @@ static void ICACHE_RAM_ATTR PackChannelDataHybridCommon(OTA_Packet4_s * const ot
     #if !defined(UNIT_TEST)
     ota4->rc.isArmed = handset->IsArmed();
     #else
-    ota4->rc.isArmed = false;
+    ota4->rc.isArmed = channelData[4] > CRSF_CHANNEL_VALUE_MID;
     #endif
 #endif /* !DEBUG_RCVR_LINKSTATS */
 }
@@ -231,7 +231,7 @@ static void ICACHE_RAM_ATTR GenerateChannelData8ch12ch(OTA_Packet8_s * const ota
     #if !defined(UNIT_TEST)
     ota8->rc.isArmed = handset->IsArmed();
     #else
-    ota8->rc.isArmed = false;
+    ota8->rc.isArmed = channelData[4] > CRSF_CHANNEL_VALUE_MID;
     #endif
 #if defined(DEBUG_RCVR_LINKSTATS)
     // Incremental packet counter for verification on the RX side, 32 bits shoved into CH1-CH4
