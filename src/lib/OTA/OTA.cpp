@@ -42,7 +42,7 @@ static inline uint8_t ICACHE_RAM_ATTR HybridWideNonceToSwitchIndex(uint8_t const
     return ((nonce & 0b111) + ((nonce >> 3) & 0b1)) % 8;
 }
 
-#if TARGET_TX
+#if defined(TARGET_TX) || defined(UNIT_TEST)
 
 #include "handset.h"            // need access to handset data for arming
 
