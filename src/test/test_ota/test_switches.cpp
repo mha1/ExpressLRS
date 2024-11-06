@@ -18,6 +18,7 @@
 #include "POWERMGNT.h"
 #include <OTA.h>
 #include "crsf_sysmocks.h"
+#include "CRSFHandset.h"
 
 CRSF crsf;  // need an instance to provide the fields used by the code under test
 uint32_t ChannelData[CRSF_NUM_CHANNELS];      // Current state of channels, CRSF format
