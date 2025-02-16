@@ -868,7 +868,7 @@ static void WebUpdateGetFirmware(AsyncWebServerRequest *request) {
 
 static void HandleContinuousWave(AsyncWebServerRequest *request) {
   if (request->hasArg("radio")) {
-    SX12XX_Radio_Number_t radio = request->arg("radio").toInt() == 1 ? SX12XX_Radio_1 : SX12XX_Radio_2;
+    Radio_Number_t radio = request->arg("radio").toInt() == 1 ? Radio_1 : Radio_2;
 
 #if defined(RADIO_LR1121)
     bool setSubGHz = false;

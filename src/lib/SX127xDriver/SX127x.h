@@ -2,7 +2,6 @@
 
 #include "SX127xRegs.h"
 #include "SX127xHal.h"
-#include "SX12xxDriverCommon.h"
 
 #ifdef PLATFORM_ESP8266
 #include <cstdint>
@@ -10,7 +9,7 @@
 
 #define RADIO_SNR_SCALE 4
 
-class SX127xDriver: public SX12xxDriverCommon
+class SX127xDriver: public RadioDriverCommon
 {
 
 public:
@@ -28,15 +27,15 @@ public:
     SX127xDriver();
     bool Begin(uint32_t minimumFrequency, uint32_t maximumFrequency);
     void End();
-    bool DetectChip(SX12XX_Radio_Number_t radioNumber);
+    bool DetectChip(Radio_Number_t radioNumber);
     void Config(uint8_t bw, uint8_t sf, uint8_t cr, uint32_t freq, uint8_t preambleLen, uint8_t syncWord, bool InvertIQ, uint8_t _PayloadLength, uint32_t interval);
     void Config(uint8_t bw, uint8_t sf, uint8_t cr, uint32_t freq, uint8_t preambleLen, bool InvertIQ, uint8_t _PayloadLength, uint32_t interval);
-    void SetMode(SX127x_RadioOPmodes mode, SX12XX_Radio_Number_t radioNumber);
-    void SetTxIdleMode() { SetMode(SX127x_OPMODE_STANDBY, SX12XX_Radio_All); } // set Idle mode used when switching from RX to TX
+    void SetMode(SX127x_RadioOPmodes mode, Radio_Number_t radioNumber);
+    void SetTxIdleMode() { SetMode(SX127x_OPMODE_STANDBY, Radio_All); } // set Idle mode used when switching from RX to TX
     void ConfigLoraDefaults();
 
-    void startCWTest(uint32_t freq, SX12XX_Radio_Number_t radioNumber);
-    void cwRepeat(SX12XX_Radio_Number_t radioNumber);
+    void startCWTest(uint32_t freq, Radio_Number_t radioNumber);
+    void cwRepeat(Radio_Number_t radioNumber);
 
     void SetBandwidthCodingRate(SX127x_Bandwidth bw, SX127x_CodingRate cr);
     void SetCRCMode(bool on); //false for off
@@ -50,32 +49,32 @@ public:
     uint32_t GetCurrBandwidthNormalisedShifted();
 
     #define FREQ_STEP 61.03515625
-    void SetFrequencyHz(uint32_t freq, SX12XX_Radio_Number_t radioNumber);
-    void SetFrequencyReg(uint32_t freq, SX12XX_Radio_Number_t radioNumber = SX12XX_Radio_All);
+    void SetFrequencyHz(uint32_t freq, Radio_Number_t radioNumber);
+    void SetFrequencyReg(uint32_t freq, Radio_Number_t radioNumber = Radio_All);
     bool FrequencyErrorAvailable() const { return true; }
     int32_t GetFrequencyError();
-    bool GetFrequencyErrorbool(SX12XX_Radio_Number_t radioNumber);
-    void SetPPMoffsetReg(int32_t offset, SX12XX_Radio_Number_t radioNumber);
+    bool GetFrequencyErrorbool(Radio_Number_t radioNumber);
+    void SetPPMoffsetReg(int32_t offset, Radio_Number_t radioNumber);
 
     ////////////////////////////////////////////////////
 
     /////////////////Utility Funcitons//////////////////
-    uint8_t GetIrqFlags(SX12XX_Radio_Number_t radioNumber);
-    void ClearIrqFlags(SX12XX_Radio_Number_t radioNumber);
+    uint8_t GetIrqFlags(Radio_Number_t radioNumber);
+    void ClearIrqFlags(Radio_Number_t radioNumber);
 
     //////////////RX related Functions/////////////////
 
     //uint8_t RunCAD();
 
-    uint8_t UnsignedGetLastPacketRSSI(SX12XX_Radio_Number_t radioNumber);
-    int8_t GetLastPacketRSSI(SX12XX_Radio_Number_t radioNumber);
-    int8_t GetLastPacketSNRRaw(SX12XX_Radio_Number_t radioNumber);
-    int8_t GetCurrRSSI(SX12XX_Radio_Number_t radioNumber);
+    uint8_t UnsignedGetLastPacketRSSI(Radio_Number_t radioNumber);
+    int8_t GetLastPacketRSSI(Radio_Number_t radioNumber);
+    int8_t GetLastPacketSNRRaw(Radio_Number_t radioNumber);
+    int8_t GetCurrRSSI(Radio_Number_t radioNumber);
     void GetLastPacketStats();
     void CheckForSecondPacket();
 
     ////////////Non-blocking TX related Functions/////////////////
-    void TXnb(uint8_t * data, uint8_t size, bool sendGeminiBuffer, uint8_t * dataGemini, SX12XX_Radio_Number_t radioNumber);
+    void TXnb(uint8_t * data, uint8_t size, bool sendGeminiBuffer, uint8_t * dataGemini, Radio_Number_t radioNumber);
     /////////////Non-blocking RX related Functions///////////////
     void RXnb();
 
@@ -97,8 +96,8 @@ private:
 
     static void IsrCallback_1();
     static void IsrCallback_2();
-    static void IsrCallback(SX12XX_Radio_Number_t radioNumber);
-    bool RXnbISR(SX12XX_Radio_Number_t radioNumber); // ISR for non-blocking RX routine
+    static void IsrCallback(Radio_Number_t radioNumber);
+    bool RXnbISR(Radio_Number_t radioNumber); // ISR for non-blocking RX routine
     void TXnbISR(); // ISR for non-blocking TX routine
     void CommitOutputPower();
 };

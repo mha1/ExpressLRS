@@ -106,17 +106,17 @@ void ICACHE_RAM_ATTR SetClearChannelAssessmentTime(void)
 #endif
 }
 
-SX12XX_Radio_Number_t ICACHE_RAM_ATTR ChannelIsClear(SX12XX_Radio_Number_t radioNumber)
+Radio_Number_t ICACHE_RAM_ATTR ChannelIsClear(Radio_Number_t radioNumber)
 {
-  if (radioNumber == SX12XX_Radio_NONE)
-    return SX12XX_Radio_NONE;
+  if (radioNumber == Radio_NONE)
+    return Radio_NONE;
 
   LBTSuccessCalc.inc(); // Increment count for every channel check
 
   if (!LBTEnabled)
   {
     LBTSuccessCalc.add();
-    return SX12XX_Radio_All;
+    return Radio_All;
   }
 
   // Read rssi after waiting the minimum RSSI valid delay.
@@ -140,24 +140,24 @@ SX12XX_Radio_Number_t ICACHE_RAM_ATTR ChannelIsClear(SX12XX_Radio_Number_t radio
 
   int8_t rssiInst1 = 0;
   int8_t rssiInst2 = 0;
-  SX12XX_Radio_Number_t clearChannelsMask = SX12XX_Radio_NONE;
+  Radio_Number_t clearChannelsMask = Radio_NONE;
   int8_t rssiCutOff = PowerEnumToLBTLimit((PowerLevels_e)POWERMGNT::currPower(), ExpressLRS_currAirRate_Modparams->radio_type);
 
-  if (radioNumber & SX12XX_Radio_1)
+  if (radioNumber & Radio_1)
   {
-    rssiInst1 = Radio.GetRssiInst(SX12XX_Radio_1);
+    rssiInst1 = Radio.GetRssiInst(Radio_1);
     if(rssiInst1 < rssiCutOff)
     {
-      clearChannelsMask |= SX12XX_Radio_1;
+      clearChannelsMask |= Radio_1;
     }
   }
 
-  if (radioNumber & SX12XX_Radio_2)
+  if (radioNumber & Radio_2)
   {
-    rssiInst2 = Radio.GetRssiInst(SX12XX_Radio_2);
+    rssiInst2 = Radio.GetRssiInst(Radio_2);
     if(rssiInst2 < rssiCutOff)
     {
-      clearChannelsMask |= SX12XX_Radio_2;
+      clearChannelsMask |= Radio_2;
     }
   }
 

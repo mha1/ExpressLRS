@@ -9,5 +9,5 @@ extern LQCALC<100> LBTSuccessCalc;
 extern bool LBTEnabled;
 
 void ICACHE_RAM_ATTR SetClearChannelAssessmentTime(void);
-SX12XX_Radio_Number_t ICACHE_RAM_ATTR ChannelIsClear(SX12XX_Radio_Number_t radioNumber);
+Radio_Number_t ICACHE_RAM_ATTR ChannelIsClear(Radio_Number_t radioNumber);
 #endif

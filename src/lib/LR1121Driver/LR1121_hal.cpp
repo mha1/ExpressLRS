@@ -59,7 +59,7 @@ void LR1121Hal::init()
         digitalWrite(GPIO_PIN_NSS_2, HIGH);
         spiAttachSS(SPIEx.bus(), 1, GPIO_PIN_NSS_2);
     }
-    spiEnableSSPins(SPIEx.bus(), SX12XX_Radio_All);
+    spiEnableSSPins(SPIEx.bus(), Radio_All);
 #elif defined(PLATFORM_ESP8266)
     DBGLN("PLATFORM_ESP8266");
     SPIEx.begin();
@@ -117,10 +117,10 @@ void LR1121Hal::reset(bool bootloader)
         }
     }
 
-    WaitOnBusy(SX12XX_Radio_All);
+    WaitOnBusy(Radio_All);
 }
 
-void ICACHE_RAM_ATTR LR1121Hal::WriteCommand(uint16_t command, uint8_t *buffer, uint8_t size, SX12XX_Radio_Number_t radioNumber)
+void ICACHE_RAM_ATTR LR1121Hal::WriteCommand(uint16_t command, uint8_t *buffer, uint8_t size, Radio_Number_t radioNumber)
 {
     WORD_ALIGNED_ATTR uint8_t OutBuffer[WORD_PADDED(size + 2)] = {
         (uint8_t)((command & 0xFF00) >> 8),
@@ -133,7 +133,7 @@ void ICACHE_RAM_ATTR LR1121Hal::WriteCommand(uint16_t command, uint8_t *buffer, 
     SPIEx.write(radioNumber, OutBuffer, size + 2);
 }
 
-void ICACHE_RAM_ATTR LR1121Hal::WriteCommand(uint16_t command, SX12XX_Radio_Number_t radioNumber)
+void ICACHE_RAM_ATTR LR1121Hal::WriteCommand(uint16_t command, Radio_Number_t radioNumber)
 {
     WORD_ALIGNED_ATTR uint8_t OutBuffer[WORD_PADDED(2)] = {
         (uint8_t)((command & 0xFF00) >> 8),
@@ -144,7 +144,7 @@ void ICACHE_RAM_ATTR LR1121Hal::WriteCommand(uint16_t command, SX12XX_Radio_Numb
     SPIEx.write(radioNumber, OutBuffer, 2);
 }
 
-void ICACHE_RAM_ATTR LR1121Hal::ReadCommand(uint8_t *buffer, uint8_t size, SX12XX_Radio_Number_t radioNumber)
+void ICACHE_RAM_ATTR LR1121Hal::ReadCommand(uint8_t *buffer, uint8_t size, Radio_Number_t radioNumber)
 {
     WORD_ALIGNED_ATTR uint8_t InBuffer[WORD_PADDED(size)] = {0};
 
@@ -156,22 +156,22 @@ void ICACHE_RAM_ATTR LR1121Hal::ReadCommand(uint8_t *buffer, uint8_t size, SX12X
     memcpy(buffer, InBuffer, size);
 }
 
-bool ICACHE_RAM_ATTR LR1121Hal::WaitOnBusy(SX12XX_Radio_Number_t radioNumber)
+bool ICACHE_RAM_ATTR LR1121Hal::WaitOnBusy(Radio_Number_t radioNumber)
 {
     constexpr uint32_t wtimeoutUS = 1000U;
     uint32_t startTime = 0;
 
     while (true)
     {
-        if (radioNumber == SX12XX_Radio_1)
+        if (radioNumber == Radio_1)
         {
             if (digitalRead(GPIO_PIN_BUSY) == LOW) return true;
         }
-        else if (radioNumber == SX12XX_Radio_2)
+        else if (radioNumber == Radio_2)
         {
             if (GPIO_PIN_BUSY_2 == UNDEF_PIN || digitalRead(GPIO_PIN_BUSY_2) == LOW) return true;
         }
-        else if (radioNumber == SX12XX_Radio_All)
+        else if (radioNumber == Radio_All)
         {
             if (GPIO_PIN_BUSY_2 != UNDEF_PIN)
             {

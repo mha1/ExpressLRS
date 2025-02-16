@@ -160,9 +160,9 @@ void ICACHE_RAM_ATTR LinkStatsFromOta(OTA_LinkStats_s * const ls)
   MspSender.ConfirmCurrentPayload(ls->tlmConfirm);
 }
 
-bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status)
+bool ICACHE_RAM_ATTR ProcessTLMpacket(RadioDriverCommon::rx_status const status)
 {
-  if (status != SX12xxDriverCommon::SX12XX_RX_OK)
+  if (status != RadioDriverCommon::SX12XX_RX_OK)
   {
     DBGLN("TLM HW CRC error");
     return false;
@@ -213,7 +213,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
 
         if (config.GetAntennaMode() == TX_RADIO_MODE_GEMINI)
         {
-            if (Radio.GetProcessingPacketRadio() == SX12XX_Radio_1)
+            if (Radio.GetProcessingPacketRadio() == Radio_1)
             {
                 packageIndexRadio1 = ota8->tlm_dl.packageIndex;
                 memcpy(tlmSenderDoubleBuffer, ota8->tlm_dl.ul_link_stats.payload, sizeof(ota8->tlm_dl.ul_link_stats.payload));
@@ -224,12 +224,12 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
                 memcpy(&tlmSenderDoubleBuffer[sizeof(ota8->tlm_dl.ul_link_stats.payload)], ota8->tlm_dl.ul_link_stats.payload, sizeof(ota8->tlm_dl.ul_link_stats.payload));
             }
 
-            if (Radio.GetProcessingPacketRadio() == SX12XX_Radio_1 && Radio.hasSecondRadioGotData)
+            if (Radio.GetProcessingPacketRadio() == Radio_1 && Radio.hasSecondRadioGotData)
             {
                 packageIndexRadio2 = ota8Second->tlm_dl.packageIndex;
                 memcpy(&tlmSenderDoubleBuffer[sizeof(ota8Second->tlm_dl.ul_link_stats.payload)], ota8Second->tlm_dl.ul_link_stats.payload, sizeof(ota8Second->tlm_dl.ul_link_stats.payload));
             }
-            else if (Radio.GetProcessingPacketRadio() == SX12XX_Radio_2 && Radio.hasSecondRadioGotData)
+            else if (Radio.GetProcessingPacketRadio() == Radio_2 && Radio.hasSecondRadioGotData)
             {
                 packageIndexRadio1 = ota8Second->tlm_dl.packageIndex;
                 memcpy(tlmSenderDoubleBuffer, ota8Second->tlm_dl.ul_link_stats.payload, sizeof(ota8Second->tlm_dl.ul_link_stats.payload));
@@ -259,7 +259,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
         {
             if (config.GetAntennaMode() == TX_RADIO_MODE_GEMINI)
             {
-                if (Radio.GetProcessingPacketRadio() == SX12XX_Radio_1)
+                if (Radio.GetProcessingPacketRadio() == Radio_1)
                 {
                     packageIndexRadio1 = ota8->tlm_dl.packageIndex;
                     memcpy(tlmSenderDoubleBuffer, ota8->tlm_dl.payload, sizeof(ota8->tlm_dl.payload));
@@ -270,12 +270,12 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
                     memcpy(&tlmSenderDoubleBuffer[sizeof(ota8->tlm_dl.payload)], ota8->tlm_dl.payload, sizeof(ota8->tlm_dl.payload));
                 }
 
-                if (Radio.GetProcessingPacketRadio() == SX12XX_Radio_1 && Radio.hasSecondRadioGotData)
+                if (Radio.GetProcessingPacketRadio() == Radio_1 && Radio.hasSecondRadioGotData)
                 {
                     packageIndexRadio2 = ota8Second->tlm_dl.packageIndex;
                     memcpy(&tlmSenderDoubleBuffer[sizeof(ota8Second->tlm_dl.payload)], ota8Second->tlm_dl.payload, sizeof(ota8Second->tlm_dl.payload));
                 }
-                else if (Radio.GetProcessingPacketRadio() == SX12XX_Radio_2 && Radio.hasSecondRadioGotData)
+                else if (Radio.GetProcessingPacketRadio() == Radio_2 && Radio.hasSecondRadioGotData)
                 {
                     packageIndexRadio1 = ota8Second->tlm_dl.packageIndex;
                     memcpy(tlmSenderDoubleBuffer, ota8Second->tlm_dl.payload, sizeof(ota8Second->tlm_dl.payload));
@@ -324,7 +324,7 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
         {
             if (config.GetAntennaMode() == TX_RADIO_MODE_GEMINI)
             {
-                if (Radio.GetProcessingPacketRadio() == SX12XX_Radio_1)
+                if (Radio.GetProcessingPacketRadio() == Radio_1)
                 {
                     packageIndexRadio1 = otaPktPtr->std.tlm_dl.packageIndex;
                     memcpy(tlmSenderDoubleBuffer, otaPktPtr->std.tlm_dl.payload, sizeof(otaPktPtr->std.tlm_dl.payload));
@@ -335,12 +335,12 @@ bool ICACHE_RAM_ATTR ProcessTLMpacket(SX12xxDriverCommon::rx_status const status
                     memcpy(&tlmSenderDoubleBuffer[sizeof(otaPktPtr->std.tlm_dl.payload)], otaPktPtr->std.tlm_dl.payload, sizeof(otaPktPtr->std.tlm_dl.payload));
                 }
 
-                if (Radio.GetProcessingPacketRadio() == SX12XX_Radio_1 && Radio.hasSecondRadioGotData)
+                if (Radio.GetProcessingPacketRadio() == Radio_1 && Radio.hasSecondRadioGotData)
                 {
                     packageIndexRadio2 = otaPktPtrSecond->std.tlm_dl.packageIndex;
                     memcpy(&tlmSenderDoubleBuffer[sizeof(otaPktPtrSecond->std.tlm_dl.payload)], otaPktPtrSecond->std.tlm_dl.payload, sizeof(otaPktPtrSecond->std.tlm_dl.payload));
                 }
-                else if (Radio.GetProcessingPacketRadio() == SX12XX_Radio_2 && Radio.hasSecondRadioGotData)
+                else if (Radio.GetProcessingPacketRadio() == Radio_2 && Radio.hasSecondRadioGotData)
                 {
                     packageIndexRadio1 = otaPktPtrSecond->std.tlm_dl.packageIndex;
                     memcpy(tlmSenderDoubleBuffer, otaPktPtrSecond->std.tlm_dl.payload, sizeof(otaPktPtrSecond->std.tlm_dl.payload));
@@ -490,7 +490,7 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
     Radio.Config(ModParams->bw2, ModParams->sf2, ModParams->cr2, FHSSgetInitialGeminiFreq(),
                 ModParams->PreambleLen2, invertIQ, ModParams->PayloadLength, ModParams->interval,
                 (ModParams->radio_type == RADIO_TYPE_LR1121_GFSK_900 || ModParams->radio_type == RADIO_TYPE_LR1121_GFSK_2G4),
-                (uint8_t)UID[5], (uint8_t)UID[4], SX12XX_Radio_2);
+                (uint8_t)UID[5], (uint8_t)UID[4], Radio_2);
   }
 #endif
 
@@ -498,7 +498,7 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
 
   if ((isDualRadio() && config.GetAntennaMode() == TX_RADIO_MODE_GEMINI) || FHSSuseDualBand) // Gemini mode
   {
-    Radio.SetFrequencyReg(FHSSgetInitialGeminiFreq(), SX12XX_Radio_2);
+    Radio.SetFrequencyReg(FHSSgetInitialGeminiFreq(), Radio_2);
   }
 
   // InitialFreq has been set, so lets also reset the FHSS Idx and Nonce.
@@ -529,16 +529,16 @@ void ICACHE_RAM_ATTR HandleFHSS()
     if ((isDualRadio() && config.GetAntennaMode() == TX_RADIO_MODE_GEMINI) || FHSSuseDualBand)
     {
         // Optimises the SPI traffic order.
-        if (Radio.GetProcessingPacketRadio() == SX12XX_Radio_1)
+        if (Radio.GetProcessingPacketRadio() == Radio_1)
         {
             uint32_t freqRadio = FHSSgetNextFreq();
-            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), SX12XX_Radio_2);
-            Radio.SetFrequencyReg(freqRadio, SX12XX_Radio_1);
+            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), Radio_2);
+            Radio.SetFrequencyReg(freqRadio, Radio_1);
         }
         else
         {
-            Radio.SetFrequencyReg(FHSSgetNextFreq(), SX12XX_Radio_1);
-            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), SX12XX_Radio_2);
+            Radio.SetFrequencyReg(FHSSgetNextFreq(), Radio_1);
+            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), Radio_2);
         }
     }
     else
@@ -698,24 +698,24 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   ///// Next, Calculate the CRC and put it into the buffer /////
   OtaGeneratePacketCrc(&otaPkt);
 
-  SX12XX_Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
+  Radio_Number_t transmittingRadio = Radio.GetLastSuccessfulPacketRadio();
 
   if (isDualRadio())
   {
     switch (config.GetAntennaMode())
     {
     case TX_RADIO_MODE_GEMINI:
-      transmittingRadio = SX12XX_Radio_All; // Gemini mode
+      transmittingRadio = Radio_All; // Gemini mode
       break;
     case TX_RADIO_MODE_ANT_1:
-      transmittingRadio = SX12XX_Radio_1; // Single antenna tx and true diversity rx for tlm receiption.
+      transmittingRadio = Radio_1; // Single antenna tx and true diversity rx for tlm receiption.
       break;
     case TX_RADIO_MODE_ANT_2:
-      transmittingRadio = SX12XX_Radio_2; // Single antenna tx and true diversity rx for tlm receiption.
+      transmittingRadio = Radio_2; // Single antenna tx and true diversity rx for tlm receiption.
       break;
     case TX_RADIO_MODE_SWITCH:
-      if(OtaNonce%2==0)   transmittingRadio = SX12XX_Radio_1; // Single antenna tx and true diversity rx for tlm receiption.
-      else   transmittingRadio = SX12XX_Radio_2; // Single antenna tx and true diversity rx for tlm receiption.
+      if(OtaNonce%2==0)   transmittingRadio = Radio_1; // Single antenna tx and true diversity rx for tlm receiption.
+      else   transmittingRadio = Radio_2; // Single antenna tx and true diversity rx for tlm receiption.
       break;
     default:
       break;
@@ -725,7 +725,7 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
 #if defined(Regulatory_Domain_EU_CE_2400)
   transmittingRadio &= ChannelIsClear(transmittingRadio);   // weed out the radio(s) if channel in use
 
-  if (transmittingRadio == SX12XX_Radio_NONE)
+  if (transmittingRadio == Radio_NONE)
   {
     // No packet will be sent due to LBT.
     // Defer TXdoneCallback() to prepare for TLM when the IRQ is normally triggered.
@@ -926,7 +926,7 @@ static void CheckConfigChangePending()
   }
 }
 
-bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
+bool ICACHE_RAM_ATTR RXdoneISR(RadioDriverCommon::rx_status const status)
 {
   if (LQCalc.currentIsSet())
   {

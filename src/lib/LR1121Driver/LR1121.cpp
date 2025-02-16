@@ -17,19 +17,19 @@ static uint32_t endTX;
 // RxTimeout is expressed in periods of the 32.768kHz RTC
 #define RX_TIMEOUT_PERIOD_BASE_NANOS 1000000000 / 32768 // TODO check for LR1121
 
-LR1121Driver::LR1121Driver(): SX12xxDriverCommon()
+LR1121Driver::LR1121Driver(): RadioDriverCommon()
 {
     useFSK = false;
     instance = this;
     timeout = 0xFFFFFF;
-    lastSuccessfulPacketRadio = SX12XX_Radio_1;
+    lastSuccessfulPacketRadio = Radio_1;
     fallBackMode = LR1121_MODE_FS;
     useFEC = false;
 }
 
 void LR1121Driver::End()
 {
-    SetMode(LR1121_MODE_SLEEP, SX12XX_Radio_All);
+    SetMode(LR1121_MODE_SLEEP, Radio_All);
     hal.end();
     RemoveCallbacks();
 }
@@ -44,8 +44,8 @@ bool LR1121Driver::Begin(uint32_t minimumFrequency, uint32_t maximumFrequency)
 
     // Validate that the LR1121 is working.
     uint8_t version[5] = {0};
-    hal.WriteCommand(LR11XX_SYSTEM_GET_VERSION_OC, SX12XX_Radio_1);
-    hal.ReadCommand(version, sizeof(version), SX12XX_Radio_1);
+    hal.WriteCommand(LR11XX_SYSTEM_GET_VERSION_OC, Radio_1);
+    hal.ReadCommand(version, sizeof(version), Radio_1);
 
     DBGLN("Read LR1121 #1 Use Case (0x03 = LR1121): %d", version[2]);
     if (version[2] != 0x03)
@@ -59,8 +59,8 @@ bool LR1121Driver::Begin(uint32_t minimumFrequency, uint32_t maximumFrequency)
     {
         // Validate that the LR1121 #2 is working.
         memset(version, 0, sizeof(version));
-        hal.WriteCommand(LR11XX_SYSTEM_GET_VERSION_OC, SX12XX_Radio_2);
-        hal.ReadCommand(version, sizeof(version), SX12XX_Radio_2);
+        hal.WriteCommand(LR11XX_SYSTEM_GET_VERSION_OC, Radio_2);
+        hal.ReadCommand(version, sizeof(version), Radio_2);
 
         DBGLN("Read LR1121 #2 Use Case (0x03 = LR1121): %d", version[2]);
         if (version[2] != 0x03)
@@ -72,7 +72,7 @@ bool LR1121Driver::Begin(uint32_t minimumFrequency, uint32_t maximumFrequency)
     }
 
     //Clear Errors
-    hal.WriteCommand(LR11XX_SYSTEM_CLEAR_ERRORS_OC, SX12XX_Radio_All); // Remove later?  Might not be required???
+    hal.WriteCommand(LR11XX_SYSTEM_CLEAR_ERRORS_OC, Radio_All); // Remove later?  Might not be required???
 
 /*
 Do not enable for dual radio TX.
@@ -83,11 +83,11 @@ transitioning from FS mode and the other from Standby mode. This causes the tx d
     // 7.2.5 SetRxTxFallbackMode
     uint8_t FBbuf[1] = {LR11XX_RADIO_FALLBACK_FS};
     fallBackMode = LR1121_MODE_FS;
-    hal.WriteCommand(LR11XX_RADIO_SET_RX_TX_FALLBACK_MODE_OC, FBbuf, sizeof(FBbuf), SX12XX_Radio_All);
+    hal.WriteCommand(LR11XX_RADIO_SET_RX_TX_FALLBACK_MODE_OC, FBbuf, sizeof(FBbuf), Radio_All);
 
     // 7.2.12 SetRxBoosted
     uint8_t abuf[1] = {1};
-    hal.WriteCommand(LR11XX_RADIO_SET_RX_BOOSTED_OC, abuf, sizeof(abuf), SX12XX_Radio_All);
+    hal.WriteCommand(LR11XX_RADIO_SET_RX_BOOSTED_OC, abuf, sizeof(abuf), Radio_All);
 
     SetDioAsRfSwitch();
     SetDioIrqParams();
@@ -96,20 +96,20 @@ transitioning from FS mode and the other from Standby mode. This causes the tx d
     {
         // 5.1.1 SetRegMode
         uint8_t RegMode[1] = {1};
-        hal.WriteCommand(LR11XX_SYSTEM_SET_REGMODE_OC, RegMode, sizeof(RegMode), SX12XX_Radio_All); // Enable DCDC converter instead of LDO
+        hal.WriteCommand(LR11XX_SYSTEM_SET_REGMODE_OC, RegMode, sizeof(RegMode), Radio_All); // Enable DCDC converter instead of LDO
     }
 
     // 2.1.3.1 CalibImage
     uint8_t CalImagebuf[2];
     CalImagebuf[0] = ((minimumFrequency / 1000000 ) - 1) / 4;       // Freq1 = floor( (fmin_mhz - 1)/4)
     CalImagebuf[1] = 1 + ((maximumFrequency / 1000000 ) + 1) / 4;   // Freq2 = ceil( (fmax_mhz + 1)/4)
-    hal.WriteCommand(LR11XX_SYSTEM_CALIBRATE_IMAGE_OC, CalImagebuf, sizeof(CalImagebuf), SX12XX_Radio_All);
+    hal.WriteCommand(LR11XX_SYSTEM_CALIBRATE_IMAGE_OC, CalImagebuf, sizeof(CalImagebuf), Radio_All);
 
     return true;
 }
 
 // 12.2.1 SetTxCw
-void LR1121Driver::startCWTest(uint32_t freq, SX12XX_Radio_Number_t radioNumber)
+void LR1121Driver::startCWTest(uint32_t freq, Radio_Number_t radioNumber)
 {
     // Set a basic Config that can be used for both 2.4G and SubGHz bands.
     Config(LR11XX_RADIO_LORA_BW_62, LR11XX_RADIO_LORA_SF6, LR11XX_RADIO_LORA_CR_4_8, freq, 12, false, 8, 0, false, 0, 0, radioNumber);
@@ -120,16 +120,16 @@ void LR1121Driver::startCWTest(uint32_t freq, SX12XX_Radio_Number_t radioNumber)
 void LR1121Driver::Config(uint8_t bw, uint8_t sf, uint8_t cr, uint32_t regfreq,
                           uint8_t PreambleLength, bool InvertIQ, uint8_t _PayloadLength, uint32_t interval,
                           bool setFSKModulation, uint8_t fskSyncWord1, uint8_t fskSyncWord2,
-                          SX12XX_Radio_Number_t radioNumber)
+                          Radio_Number_t radioNumber)
 {
     PayloadLength = _PayloadLength;
 
     bool isSubGHz = regfreq < 1000000000;
 
-    if (radioNumber & SX12XX_Radio_1)
+    if (radioNumber & Radio_1)
         radio1isSubGHz = isSubGHz;
 
-    if (radioNumber & SX12XX_Radio_2)
+    if (radioNumber & Radio_2)
         radio2isSubGHz = isSubGHz;
 
     IQinverted = InvertIQ ? LR11XX_RADIO_LORA_IQ_INVERTED : LR11XX_RADIO_LORA_IQ_STANDARD;
@@ -189,7 +189,7 @@ void LR1121Driver::Config(uint8_t bw, uint8_t sf, uint8_t cr, uint32_t regfreq,
     ClearIrqStatus(radioNumber);
 }
 
-void LR1121Driver::ConfigModParamsFSK(uint32_t Bitrate, uint8_t BWF, uint32_t Fdev, SX12XX_Radio_Number_t radioNumber)
+void LR1121Driver::ConfigModParamsFSK(uint32_t Bitrate, uint8_t BWF, uint32_t Fdev, Radio_Number_t radioNumber)
 {
     // 8.5.1 SetModulationParams
     uint8_t buf[10];
@@ -206,7 +206,7 @@ void LR1121Driver::ConfigModParamsFSK(uint32_t Bitrate, uint8_t BWF, uint32_t Fd
     hal.WriteCommand(LR11XX_RADIO_SET_MODULATION_PARAM_OC, buf, sizeof(buf), radioNumber);
 }
 
-void LR1121Driver::SetPacketParamsFSK(uint8_t PreambleLength, uint8_t PayloadLength, SX12XX_Radio_Number_t radioNumber)
+void LR1121Driver::SetPacketParamsFSK(uint8_t PreambleLength, uint8_t PayloadLength, Radio_Number_t radioNumber)
 {
     // 8.5.2 SetPacketParams
     uint8_t buf[9];
@@ -222,7 +222,7 @@ void LR1121Driver::SetPacketParamsFSK(uint8_t PreambleLength, uint8_t PayloadLen
     hal.WriteCommand(LR11XX_RADIO_SET_PKT_PARAM_OC, buf, sizeof(buf), radioNumber);
 }
 
-void LR1121Driver::SetFSKSyncWord(uint8_t fskSyncWord1, uint8_t fskSyncWord2, SX12XX_Radio_Number_t radioNumber)
+void LR1121Driver::SetFSKSyncWord(uint8_t fskSyncWord1, uint8_t fskSyncWord2, Radio_Number_t radioNumber)
 {
     // 8.5.3 SetGfskSyncWord
     // SyncWordLen is 16 bits as set in SetPacketParamsFSK().  Fill the rest with preamble bytes.
@@ -256,7 +256,7 @@ void LR1121Driver::SetDioAsRfSwitch()
         switchbuf[6] = 0;          // Unused
         switchbuf[7] = 0b00000001; // RfSwWifiCfg - Each bit indicates the state of the relevant RFSW DIO when in Wi-Fi scanning mode or high frequency RX mode (LR1110_H1_UM_V1-7-1.pdf)
     }
-    hal.WriteCommand(LR11XX_SYSTEM_SET_DIO_AS_RF_SWITCH_OC, switchbuf, sizeof(switchbuf), SX12XX_Radio_All);
+    hal.WriteCommand(LR11XX_SYSTEM_SET_DIO_AS_RF_SWITCH_OC, switchbuf, sizeof(switchbuf), Radio_All);
 }
 
 void LR1121Driver::SetRxTimeoutUs(uint32_t interval)
@@ -268,7 +268,7 @@ void LR1121Driver::SetRxTimeoutUs(uint32_t interval)
     }
 }
 
-void LR1121Driver::CorrectRegisterForSF6(uint8_t sf, SX12XX_Radio_Number_t radioNumber)
+void LR1121Driver::CorrectRegisterForSF6(uint8_t sf, Radio_Number_t radioNumber)
 {
     // 8.3.1 SetModulationParams
     // - SF6 can be made compatible with the SX127x family in implicit mode via a register setting.
@@ -350,16 +350,16 @@ void ICACHE_RAM_ATTR LR1121Driver::CommitOutputPower()
 
     if (pwrForceUpdate)
     {
-        WriteOutputPower(radio1isSubGHz ? pwrCurrentLF : pwrCurrentHF, radio1isSubGHz, SX12XX_Radio_1);
+        WriteOutputPower(radio1isSubGHz ? pwrCurrentLF : pwrCurrentHF, radio1isSubGHz, Radio_1);
         if (GPIO_PIN_NSS_2 != UNDEF_PIN)
         {
-            WriteOutputPower(radio2isSubGHz ? pwrCurrentLF : pwrCurrentHF, radio2isSubGHz, SX12XX_Radio_2);
+            WriteOutputPower(radio2isSubGHz ? pwrCurrentLF : pwrCurrentHF, radio2isSubGHz, Radio_2);
         }
         pwrForceUpdate = false;
     }
 }
 
-void ICACHE_RAM_ATTR LR1121Driver::WriteOutputPower(uint8_t power, bool isSubGHz, SX12XX_Radio_Number_t radioNumber)
+void ICACHE_RAM_ATTR LR1121Driver::WriteOutputPower(uint8_t power, bool isSubGHz, Radio_Number_t radioNumber)
 {
     uint8_t Pabuf[4] = {0};
     uint8_t Txbuf[2] = {power, LR11XX_RADIO_RAMP_48_US};
@@ -403,7 +403,7 @@ void ICACHE_RAM_ATTR LR1121Driver::WriteOutputPower(uint8_t power, bool isSubGHz
     hal.WriteCommand(LR11XX_RADIO_SET_TX_PARAMS_OC, Txbuf, sizeof(Txbuf), radioNumber);
 }
 
-void LR1121Driver::SetMode(lr11xx_RadioOperatingModes_t OPmode, SX12XX_Radio_Number_t radioNumber)
+void LR1121Driver::SetMode(lr11xx_RadioOperatingModes_t OPmode, Radio_Number_t radioNumber)
 {
     WORD_ALIGNED_ATTR uint8_t buf[5] = {0};
     switch (OPmode)
@@ -459,7 +459,7 @@ void LR1121Driver::SetMode(lr11xx_RadioOperatingModes_t OPmode, SX12XX_Radio_Num
     }
 }
 
-void LR1121Driver::ConfigModParamsLoRa(uint8_t bw, uint8_t sf, uint8_t cr, SX12XX_Radio_Number_t radioNumber)
+void LR1121Driver::ConfigModParamsLoRa(uint8_t bw, uint8_t sf, uint8_t cr, Radio_Number_t radioNumber)
 {
     // 8.3.1 SetModulationParams
     uint8_t buf[4];
@@ -469,18 +469,18 @@ void LR1121Driver::ConfigModParamsLoRa(uint8_t bw, uint8_t sf, uint8_t cr, SX12X
     buf[3] = 0x00; // 0x00: LowDataRateOptimize off
     hal.WriteCommand(LR11XX_RADIO_SET_MODULATION_PARAM_OC, buf, sizeof(buf), radioNumber);
 
-    if (radioNumber & SX12XX_Radio_1 && radio1isSubGHz)
-        CorrectRegisterForSF6(sf, SX12XX_Radio_1);
+    if (radioNumber & Radio_1 && radio1isSubGHz)
+        CorrectRegisterForSF6(sf, Radio_1);
 
     if (GPIO_PIN_NSS_2 != UNDEF_PIN)
     {
-        if (radioNumber & SX12XX_Radio_2 && radio2isSubGHz)
-            CorrectRegisterForSF6(sf, SX12XX_Radio_2);
+        if (radioNumber & Radio_2 && radio2isSubGHz)
+            CorrectRegisterForSF6(sf, Radio_2);
     }
 }
 
 void LR1121Driver::SetPacketParamsLoRa(uint8_t PreambleLength, lr11xx_RadioLoRaPacketLengthsModes_t HeaderType,
-                                       uint8_t PayloadLength, uint8_t InvertIQ, SX12XX_Radio_Number_t radioNumber)
+                                       uint8_t PayloadLength, uint8_t InvertIQ, Radio_Number_t radioNumber)
 {
     // 8.3.2 SetPacketParams
     uint8_t buf[6];
@@ -493,7 +493,7 @@ void LR1121Driver::SetPacketParamsLoRa(uint8_t PreambleLength, lr11xx_RadioLoRaP
     hal.WriteCommand(LR11XX_RADIO_SET_PKT_PARAM_OC, buf, sizeof(buf), radioNumber);
 }
 
-void ICACHE_RAM_ATTR LR1121Driver::SetFrequencyHz(uint32_t freq, SX12XX_Radio_Number_t radioNumber)
+void ICACHE_RAM_ATTR LR1121Driver::SetFrequencyHz(uint32_t freq, Radio_Number_t radioNumber)
 {
     // 7.2.1 SetRfFrequency
     uint8_t buf[4];
@@ -506,7 +506,7 @@ void ICACHE_RAM_ATTR LR1121Driver::SetFrequencyHz(uint32_t freq, SX12XX_Radio_Nu
     currFreq = freq;
 }
 
-void ICACHE_RAM_ATTR LR1121Driver::SetFrequencyReg(uint32_t freq, SX12XX_Radio_Number_t radioNumber)
+void ICACHE_RAM_ATTR LR1121Driver::SetFrequencyReg(uint32_t freq, Radio_Number_t radioNumber)
 {
     SetFrequencyHz(freq, radioNumber);
 }
@@ -516,11 +516,11 @@ void LR1121Driver::SetDioIrqParams()
 {
     uint8_t buf[8] = {0};
     buf[3] = LR1121_IRQ_TX_DONE | LR1121_IRQ_RX_DONE;
-    hal.WriteCommand(LR11XX_SYSTEM_SET_DIOIRQPARAMS_OC, buf, sizeof(buf), SX12XX_Radio_All);
+    hal.WriteCommand(LR11XX_SYSTEM_SET_DIOIRQPARAMS_OC, buf, sizeof(buf), Radio_All);
 }
 
 // 3.4.1 GetStatus
-uint32_t ICACHE_RAM_ATTR LR1121Driver::GetIrqStatus(SX12XX_Radio_Number_t radioNumber)
+uint32_t ICACHE_RAM_ATTR LR1121Driver::GetIrqStatus(Radio_Number_t radioNumber)
 {
     uint8_t status[6] = {0};
     status[0] = LR11XX_SYSTEM_CLEAR_IRQ_OC >> 8;
@@ -533,7 +533,7 @@ uint32_t ICACHE_RAM_ATTR LR1121Driver::GetIrqStatus(SX12XX_Radio_Number_t radioN
     return status[2] << 24 | status[3] << 16 | status[4] << 8 | status[5];
 }
 
-void ICACHE_RAM_ATTR LR1121Driver::ClearIrqStatus(SX12XX_Radio_Number_t radioNumber)
+void ICACHE_RAM_ATTR LR1121Driver::ClearIrqStatus(Radio_Number_t radioNumber)
 {
     uint8_t buf[4];
     buf[0] = 0xFF;
@@ -553,7 +553,7 @@ void ICACHE_RAM_ATTR LR1121Driver::TXnbISR()
     TXdoneCallback();
 }
 
-void ICACHE_RAM_ATTR LR1121Driver::TXnb(uint8_t * data, uint8_t size, bool sendGeminiBuffer, uint8_t * dataGemini, SX12XX_Radio_Number_t radioNumber)
+void ICACHE_RAM_ATTR LR1121Driver::TXnb(uint8_t * data, uint8_t size, bool sendGeminiBuffer, uint8_t * dataGemini, Radio_Number_t radioNumber)
 {
     transmittingRadio = radioNumber;
 
@@ -561,40 +561,40 @@ void ICACHE_RAM_ATTR LR1121Driver::TXnb(uint8_t * data, uint8_t size, bool sendG
     // if (currOpmode == SX1280_MODE_TX)
     // {
     //     DBGLN("Timeout!");
-    //     SetMode(SX1280_MODE_FS, SX12XX_Radio_All);
-    //     ClearIrqStatus(SX1280_IRQ_RADIO_ALL, SX12XX_Radio_All);
+    //     SetMode(SX1280_MODE_FS, Radio_All);
+    //     ClearIrqStatus(SX1280_IRQ_RADIO_ALL, Radio_All);
     //     TXnbISR();
     //     return;
     // }
 
-    if (radioNumber == SX12XX_Radio_NONE)
+    if (radioNumber == Radio_NONE)
     {
-        SetMode(fallBackMode, SX12XX_Radio_All);
+        SetMode(fallBackMode, Radio_All);
         return;
     }
 
 #if defined(DEBUG_RCVR_SIGNAL_STATS)
-    if (radioNumber == SX12XX_Radio_All || radioNumber == SX12XX_Radio_1)
+    if (radioNumber == Radio_All || radioNumber == Radio_1)
     {
         instance->rxSignalStats[0].telem_count++;
     }
-    if (radioNumber == SX12XX_Radio_All || radioNumber == SX12XX_Radio_2)
+    if (radioNumber == Radio_All || radioNumber == Radio_2)
     {
         instance->rxSignalStats[1].telem_count++;
     }
 #endif
 
     // Normal diversity mode
-    if (GPIO_PIN_NSS_2 != UNDEF_PIN && radioNumber != SX12XX_Radio_All)
+    if (GPIO_PIN_NSS_2 != UNDEF_PIN && radioNumber != Radio_All)
     {
         // Make sure the unused radio is in FS mode and will not receive the tx packet.
-        if (radioNumber == SX12XX_Radio_1)
+        if (radioNumber == Radio_1)
         {
-            SetMode(fallBackMode, SX12XX_Radio_2);
+            SetMode(fallBackMode, Radio_2);
         }
         else
         {
-            SetMode(fallBackMode, SX12XX_Radio_1);
+            SetMode(fallBackMode, Radio_1);
         }
     }
 
@@ -606,11 +606,11 @@ void ICACHE_RAM_ATTR LR1121Driver::TXnb(uint8_t * data, uint8_t size, bool sendG
         if (sendGeminiBuffer)
         {
             FECEncode(data, FECBuffer);
-            hal.WriteCommand(LR11XX_REGMEM_WRITE_BUFFER8_OC, FECBuffer, PayloadLength, SX12XX_Radio_1);
+            hal.WriteCommand(LR11XX_REGMEM_WRITE_BUFFER8_OC, FECBuffer, PayloadLength, Radio_1);
 
             uint8_t FECBufferGemini[PayloadLength] = {0};
             FECEncode(dataGemini, FECBufferGemini);
-            hal.WriteCommand(LR11XX_REGMEM_WRITE_BUFFER8_OC, FECBufferGemini, PayloadLength, SX12XX_Radio_2);
+            hal.WriteCommand(LR11XX_REGMEM_WRITE_BUFFER8_OC, FECBufferGemini, PayloadLength, Radio_2);
         }
         else
         {
@@ -623,8 +623,8 @@ void ICACHE_RAM_ATTR LR1121Driver::TXnb(uint8_t * data, uint8_t size, bool sendG
         // 3.7.4 WriteBuffer8
         if (sendGeminiBuffer)
         {
-            hal.WriteCommand(LR11XX_REGMEM_WRITE_BUFFER8_OC, data, size, SX12XX_Radio_1);
-            hal.WriteCommand(LR11XX_REGMEM_WRITE_BUFFER8_OC, dataGemini, size, SX12XX_Radio_2);
+            hal.WriteCommand(LR11XX_REGMEM_WRITE_BUFFER8_OC, data, size, Radio_1);
+            hal.WriteCommand(LR11XX_REGMEM_WRITE_BUFFER8_OC, dataGemini, size, Radio_2);
         }
         else
         {
@@ -639,7 +639,7 @@ void ICACHE_RAM_ATTR LR1121Driver::TXnb(uint8_t * data, uint8_t size, bool sendG
 #endif
 }
 
-bool ICACHE_RAM_ATTR LR1121Driver::RXnbISR(SX12XX_Radio_Number_t radioNumber)
+bool ICACHE_RAM_ATTR LR1121Driver::RXnbISR(Radio_Number_t radioNumber)
 {
     // 7.2.11 GetRxBufferStatus
     uint8_t buf[3] = {0};
@@ -672,16 +672,16 @@ bool ICACHE_RAM_ATTR LR1121Driver::RXnbISR(SX12XX_Radio_Number_t radioNumber)
 
 void ICACHE_RAM_ATTR LR1121Driver::RXnb(lr11xx_RadioOperatingModes_t rxMode)
 {
-    SetMode(LR1121_MODE_RX, SX12XX_Radio_All);
+    SetMode(LR1121_MODE_RX, Radio_All);
 }
 
-bool ICACHE_RAM_ATTR LR1121Driver::GetFrequencyErrorbool(SX12XX_Radio_Number_t radioNumber)
+bool ICACHE_RAM_ATTR LR1121Driver::GetFrequencyErrorbool(Radio_Number_t radioNumber)
 {
     return false;
 }
 
 // 7.2.8 GetRssiInst
-int8_t ICACHE_RAM_ATTR LR1121Driver::GetRssiInst(SX12XX_Radio_Number_t radioNumber)
+int8_t ICACHE_RAM_ATTR LR1121Driver::GetRssiInst(Radio_Number_t radioNumber)
 {
     uint8_t status[2] = {0};
     hal.WriteCommand(LR11XX_RADIO_GET_RSSI_INST_OC, radioNumber);
@@ -691,8 +691,8 @@ int8_t ICACHE_RAM_ATTR LR1121Driver::GetRssiInst(SX12XX_Radio_Number_t radioNumb
 
 void ICACHE_RAM_ATTR LR1121Driver::CheckForSecondPacket()
 {
-    SX12XX_Radio_Number_t radio[2] = {SX12XX_Radio_1, SX12XX_Radio_2};
-    uint8_t processingRadioIdx = (instance->processingPacketRadio == SX12XX_Radio_1) ? 0 : 1;
+    Radio_Number_t radio[2] = {Radio_1, Radio_2};
+    uint8_t processingRadioIdx = (instance->processingPacketRadio == Radio_1) ? 0 : 1;
     uint8_t secondRadioIdx = !processingRadioIdx;
 
     // processingRadio always passed the sanity check here
@@ -740,8 +740,8 @@ void ICACHE_RAM_ATTR LR1121Driver::CheckForSecondPacket()
 
 void ICACHE_RAM_ATTR LR1121Driver::GetLastPacketStats()
 {
-    SX12XX_Radio_Number_t radio[2] = {SX12XX_Radio_1, SX12XX_Radio_2};
-    uint8_t processingRadioIdx = (instance->processingPacketRadio == SX12XX_Radio_1) ? 0 : 1;
+    Radio_Number_t radio[2] = {Radio_1, Radio_2};
+    uint8_t processingRadioIdx = (instance->processingPacketRadio == Radio_1) ? 0 : 1;
     uint8_t secondRadioIdx = !processingRadioIdx;
 
     uint8_t status[3];
@@ -826,7 +826,7 @@ void ICACHE_RAM_ATTR LR1121Driver::IsrCallback_1()
 {
     if (digitalRead(GPIO_PIN_DIO1))
     {
-        instance->IsrCallback(SX12XX_Radio_1);
+        instance->IsrCallback(Radio_1);
     }
 }
 
@@ -834,11 +834,11 @@ void ICACHE_RAM_ATTR LR1121Driver::IsrCallback_2()
 {
     if (digitalRead(GPIO_PIN_DIO1_2))
     {
-        instance->IsrCallback(SX12XX_Radio_2);
+        instance->IsrCallback(Radio_2);
     }
 }
 
-void ICACHE_RAM_ATTR LR1121Driver::IsrCallback(SX12XX_Radio_Number_t radioNumber)
+void ICACHE_RAM_ATTR LR1121Driver::IsrCallback(Radio_Number_t radioNumber)
 {
     instance->processingPacketRadio = radioNumber;
 
@@ -846,7 +846,7 @@ void ICACHE_RAM_ATTR LR1121Driver::IsrCallback(SX12XX_Radio_Number_t radioNumber
     if (irqStatus & LR1121_IRQ_TX_DONE)
     {
         instance->TXnbISR();
-        instance->ClearIrqStatus(SX12XX_Radio_All);
+        instance->ClearIrqStatus(Radio_All);
     }
     else if (irqStatus & LR1121_IRQ_RX_DONE)
     {
@@ -856,7 +856,7 @@ void ICACHE_RAM_ATTR LR1121Driver::IsrCallback(SX12XX_Radio_Number_t radioNumber
 #if defined(DEBUG_RCVR_SIGNAL_STATS)
         else
         {
-            instance->rxSignalStats[(radioNumber == SX12XX_Radio_1) ? 0 : 1].fail_count++;
+            instance->rxSignalStats[(radioNumber == Radio_1) ? 0 : 1].fail_count++;
         }
 #endif
     }

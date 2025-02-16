@@ -3,7 +3,7 @@
 #include "targets.h"
 #include "SX1280_Regs.h"
 #include "SX1280_hal.h"
-#include "SX12xxDriverCommon.h"
+#include "RadioDriverCommon.h"
 
 #ifdef PLATFORM_ESP8266
 #include <cstdint>
@@ -11,7 +11,7 @@
 
 #define RADIO_SNR_SCALE 4 // Units for LastPacketSNRRaw
 
-class SX1280Driver: public SX12xxDriverCommon
+class SX1280Driver: public RadioDriverCommon
 {
 public:
     static SX1280Driver *instance;
@@ -26,30 +26,30 @@ public:
     SX1280Driver();
     bool Begin(uint32_t minimumFrequency, uint32_t maximumFrequency);
     void End();
-    void SetTxIdleMode() { SetMode(SX1280_MODE_FS, SX12XX_Radio_All); }; // set Idle mode used when switching from RX to TX
+    void SetTxIdleMode() { SetMode(SX1280_MODE_FS, Radio_All); }; // set Idle mode used when switching from RX to TX
     void Config(uint8_t bw, uint8_t sf, uint8_t cr, uint32_t freq,
                 uint8_t PreambleLength, bool InvertIQ, uint8_t PayloadLength, uint32_t interval,
                 uint32_t flrcSyncWord=0, uint16_t flrcCrcSeed=0, uint8_t flrc=0);
-    void SetFrequencyHz(uint32_t freq, SX12XX_Radio_Number_t radioNumber);
-    void SetFrequencyReg(uint32_t freq, SX12XX_Radio_Number_t radioNumber = SX12XX_Radio_All);
+    void SetFrequencyHz(uint32_t freq, Radio_Number_t radioNumber);
+    void SetFrequencyReg(uint32_t freq, Radio_Number_t radioNumber = Radio_All);
     void SetRxTimeoutUs(uint32_t interval);
     void SetOutputPower(int8_t power);
-    void startCWTest(uint32_t freq, SX12XX_Radio_Number_t radioNumber);
+    void startCWTest(uint32_t freq, Radio_Number_t radioNumber);
 
 
-    bool GetFrequencyErrorbool(SX12XX_Radio_Number_t radioNumber);
+    bool GetFrequencyErrorbool(Radio_Number_t radioNumber);
     bool FrequencyErrorAvailable() const { return modeSupportsFei && (LastPacketSNRRaw > 0); }
 
-    void TXnb(uint8_t * data, uint8_t size, bool sendGeminiBuffer, uint8_t * dataGemini, SX12XX_Radio_Number_t radioNumber);
+    void TXnb(uint8_t * data, uint8_t size, bool sendGeminiBuffer, uint8_t * dataGemini, Radio_Number_t radioNumber);
     void RXnb(SX1280_RadioOperatingModes_t rxMode = SX1280_MODE_RX, uint32_t incomingTimeout = 0);
 
-    uint16_t GetIrqStatus(SX12XX_Radio_Number_t radioNumber);
-    void ClearIrqStatus(uint16_t irqMask, SX12XX_Radio_Number_t radioNumber);
+    uint16_t GetIrqStatus(Radio_Number_t radioNumber);
+    void ClearIrqStatus(uint16_t irqMask, Radio_Number_t radioNumber);
 
-    void GetStatus(SX12XX_Radio_Number_t radioNumber);
+    void GetStatus(Radio_Number_t radioNumber);
 
-    uint8_t GetRxBufferAddr(SX12XX_Radio_Number_t radioNumber);
-    int8_t GetRssiInst(SX12XX_Radio_Number_t radioNumber);
+    uint8_t GetRxBufferAddr(Radio_Number_t radioNumber);
+    int8_t GetRssiInst(Radio_Number_t radioNumber);
     void GetLastPacketStats();
     void CheckForSecondPacket();
 
@@ -65,7 +65,7 @@ private:
     uint8_t pwrPending;
     SX1280_RadioOperatingModes_t fallBackMode;
 
-    void SetMode(SX1280_RadioOperatingModes_t OPmode, SX12XX_Radio_Number_t radioNumber, uint32_t incomingTimeout = 0);
+    void SetMode(SX1280_RadioOperatingModes_t OPmode, Radio_Number_t radioNumber, uint32_t incomingTimeout = 0);
     void SetFIFOaddr(uint8_t txBaseAddr, uint8_t rxBaseAddr);
 
     // LoRa functions
@@ -88,8 +88,8 @@ private:
 
     static void IsrCallback_1();
     static void IsrCallback_2();
-    static void IsrCallback(SX12XX_Radio_Number_t radioNumber);
-    bool RXnbISR(uint16_t irqStatus, SX12XX_Radio_Number_t radioNumber); // ISR for non-blocking RX routine
+    static void IsrCallback(Radio_Number_t radioNumber);
+    bool RXnbISR(uint16_t irqStatus, Radio_Number_t radioNumber); // ISR for non-blocking RX routine
     void TXnbISR(); // ISR for non-blocking TX routine
     void CommitOutputPower();
 };

@@ -270,7 +270,7 @@ void ICACHE_RAM_ATTR getRFlinkInfo()
         // BetaFlight/iNav expect positive values for -dBm (e.g. -80dBm -> sent as 80)
         CRSF::LinkStatistics.uplink_RSSI_1 = -rssiDBM;
         CRSF::LinkStatistics.uplink_RSSI_2 = -rssiDBM2;
-        antenna = (Radio.GetProcessingPacketRadio() == SX12XX_Radio_1) ? 0 : 1;
+        antenna = (Radio.GetProcessingPacketRadio() == Radio_1) ? 0 : 1;
     }
     else if (antenna == 0)
     {
@@ -347,7 +347,7 @@ void SetRFLinkRate(uint8_t index, bool bindMode) // Set speed of RF link
         Radio.Config(ModParams->bw2, ModParams->sf2, ModParams->cr2, FHSSgetInitialGeminiFreq(),
                     ModParams->PreambleLen2, invertIQ, ModParams->PayloadLength, 0,
                     ModParams->radio_type == RADIO_TYPE_LR1121_GFSK_900 || ModParams->radio_type == RADIO_TYPE_LR1121_GFSK_2G4,
-                    (uint8_t)UID[5], (uint8_t)UID[4], SX12XX_Radio_2);
+                    (uint8_t)UID[5], (uint8_t)UID[4], Radio_2);
     }
 #endif
 
@@ -356,7 +356,7 @@ void SetRFLinkRate(uint8_t index, bool bindMode) // Set speed of RF link
     checkGeminiMode();
     if (geminiMode)
     {
-        Radio.SetFrequencyReg(FHSSgetInitialGeminiFreq(), SX12XX_Radio_2);
+        Radio.SetFrequencyReg(FHSSgetInitialGeminiFreq(), Radio_2);
     }
 
     OtaUpdateSerializers(smWideOr8ch, ModParams->PayloadLength);
@@ -387,15 +387,15 @@ bool ICACHE_RAM_ATTR HandleFHSS()
     {
         if ((((OtaNonce + 1)/ExpressLRS_currAirRate_Modparams->FHSShopInterval) % 2 == 0) || FHSSuseDualBand) // When in DualBand do not switch between radios.  The OTA modulation paramters and HighFreq/LowFreq Tx amps are set during Config.
         {
-            Radio.SetFrequencyReg(FHSSgetNextFreq(), SX12XX_Radio_1);
-            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), SX12XX_Radio_2);
+            Radio.SetFrequencyReg(FHSSgetNextFreq(), Radio_1);
+            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), Radio_2);
         }
         else
         {
             // Write radio1 first. This optimises the SPI traffic order.
             uint32_t freqRadio2 = FHSSgetNextFreq();
-            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), SX12XX_Radio_1);
-            Radio.SetFrequencyReg(freqRadio2, SX12XX_Radio_2);
+            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), Radio_1);
+            Radio.SetFrequencyReg(freqRadio2, Radio_2);
         }
     }
     else
@@ -582,14 +582,14 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
         OtaGeneratePacketCrc(&otaPktGemini);
     }
 
-    SX12XX_Radio_Number_t transmittingRadio;
+    Radio_Number_t transmittingRadio;
     if (config.GetForceTlmOff())
     {
-        transmittingRadio = SX12XX_Radio_NONE;
+        transmittingRadio = Radio_NONE;
     }
     else if (isDualRadio())
     {
-        transmittingRadio = SX12XX_Radio_All;
+        transmittingRadio = Radio_All;
     }
     else
     {
@@ -600,9 +600,9 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
     transmittingRadio &= ChannelIsClear(transmittingRadio);   // weed out the radio(s) if channel in use
 #endif
 
-    if (!geminiMode && transmittingRadio == SX12XX_Radio_All) // If the receiver is in diversity mode, only send TLM on a single radio.
+    if (!geminiMode && transmittingRadio == Radio_All) // If the receiver is in diversity mode, only send TLM on a single radio.
     {
-        transmittingRadio = Radio.LastPacketRSSI > Radio.LastPacketRSSI2 ? SX12XX_Radio_1 : SX12XX_Radio_2; // Pick the radio with best rf connection to the tx.
+        transmittingRadio = Radio.LastPacketRSSI > Radio.LastPacketRSSI2 ? Radio_1 : Radio_2; // Pick the radio with best rf connection to the tx.
     }
 
     // Gemini flips frequencies between radios on the rx side only.  This is to help minimise antenna cross polarization.
@@ -617,7 +617,7 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
         Radio.TXnb((uint8_t*)&otaPktGemini, ExpressLRS_currAirRate_Modparams->PayloadLength, sendGeminiBuffer, (uint8_t*)&otaPkt, transmittingRadio);
     }
 
-    if (transmittingRadio == SX12XX_Radio_NONE)
+    if (transmittingRadio == Radio_NONE)
     {
         // No packet will be sent due to LBT / Telem forced off.
         // Defer TXdoneCallback() to prepare for TLM when the IRQ is normally triggered.
@@ -627,10 +627,10 @@ bool ICACHE_RAM_ATTR HandleSendTelemetryResponse()
     return true;
 }
 
-int32_t ICACHE_RAM_ATTR HandleFreqCorr(bool value, SX12XX_Radio_Number_t radio)
+int32_t ICACHE_RAM_ATTR HandleFreqCorr(bool value, Radio_Number_t radio)
 {
     int32_t tempFC = FreqCorrection;
-    if (radio == SX12XX_Radio_2)
+    if (radio == Radio_2)
     {
         tempFC = FreqCorrection_2;
     }
@@ -658,7 +658,7 @@ int32_t ICACHE_RAM_ATTR HandleFreqCorr(bool value, SX12XX_Radio_Number_t radio)
         }
     }
 
-    if (radio == SX12XX_Radio_1)
+    if (radio == Radio_1)
     {
         FreqCorrection = tempFC;
     }
@@ -1160,9 +1160,9 @@ static bool ICACHE_RAM_ATTR ProcessRfPacket_SYNC(uint32_t const now, OTA_Sync_s 
     return false;
 }
 
-bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
+bool ICACHE_RAM_ATTR ProcessRFPacket(RadioDriverCommon::rx_status const status)
 {
-    if (status != SX12xxDriverCommon::SX12XX_RX_OK)
+    if (status != RadioDriverCommon::SX12XX_RX_OK)
     {
         DBGVLN("HW CRC error");
         #if defined(DEBUG_RX_SCOREBOARD)
@@ -1238,7 +1238,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
 
         if (Radio.hasSecondRadioGotData)
         {
-            SX12XX_Radio_Number_t secondRadio = Radio.GetProcessingPacketRadio() == SX12XX_Radio_1 ? SX12XX_Radio_2 : SX12XX_Radio_1;
+            Radio_Number_t secondRadio = Radio.GetProcessingPacketRadio() == Radio_1 ? Radio_2 : Radio_1;
             tempFreqCorrection = HandleFreqCorr(Radio.GetFrequencyErrorbool(secondRadio), secondRadio);
             Radio.SetPPMoffsetReg(tempFreqCorrection, secondRadio);
         }
@@ -1247,7 +1247,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
 
         if (Radio.hasSecondRadioGotData)
         {
-            SX12XX_Radio_Number_t secondRadio = Radio.GetProcessingPacketRadio() == SX12XX_Radio_1 ? SX12XX_Radio_2 : SX12XX_Radio_1;
+            Radio_Number_t secondRadio = Radio.GetProcessingPacketRadio() == Radio_1 ? Radio_2 : Radio_1;
             HandleFreqCorr(Radio.GetFrequencyErrorbool(secondRadio), secondRadio);
         }
     #endif
@@ -1266,7 +1266,7 @@ bool ICACHE_RAM_ATTR ProcessRFPacket(SX12xxDriverCommon::rx_status const status)
     return true;
 }
 
-bool ICACHE_RAM_ATTR RXdoneISR(SX12xxDriverCommon::rx_status const status)
+bool ICACHE_RAM_ATTR RXdoneISR(RadioDriverCommon::rx_status const status)
 {
     if (LQCalc.currentIsSet() && connectionState == connected)
     {

@@ -3,16 +3,16 @@
 #include <targets.h>
 #include "FEC.h"
 
-typedef uint8_t SX12XX_Radio_Number_t;
+typedef uint8_t Radio_Number_t;
 enum
 {
-    SX12XX_Radio_NONE = 0b00000000,     // Bit mask for no radio
-    SX12XX_Radio_1    = 0b00000001,     // Bit mask for radio 1
-    SX12XX_Radio_2    = 0b00000010,     // Bit mask for radio 2
-    SX12XX_Radio_All  = 0b00000011      // bit mask for both radios
+    Radio_NONE = 0b00000000,     // Bit mask for no radio
+    Radio_1    = 0b00000001,     // Bit mask for radio 1
+    Radio_2    = 0b00000010,     // Bit mask for radio 2
+    Radio_All  = 0b00000011      // bit mask for both radios
 };
 
-class SX12xxDriverCommon
+class RadioDriverCommon
 {
 public:
     typedef uint8_t rx_status;
@@ -24,7 +24,7 @@ public:
         SX12XX_RX_SYNCWORD_ERROR = 1 << 2,
     };
 
-    SX12xxDriverCommon():
+    RadioDriverCommon():
         RXdoneCallback(nullCallbackRx),
         TXdoneCallback(nullCallbackTx) {}
 
@@ -44,12 +44,12 @@ public:
     uint8_t PayloadLength;
     bool IQinverted;
 
-    SX12XX_Radio_Number_t processingPacketRadio;
-    SX12XX_Radio_Number_t lastSuccessfulPacketRadio;
-    SX12XX_Radio_Number_t transmittingRadio;
-    SX12XX_Radio_Number_t GetProcessingPacketRadio() { return processingPacketRadio; }
-    SX12XX_Radio_Number_t GetLastSuccessfulPacketRadio() { return lastSuccessfulPacketRadio; }
-    SX12XX_Radio_Number_t GetLastTransmitRadio() {return transmittingRadio; }
+    Radio_Number_t processingPacketRadio;
+    Radio_Number_t lastSuccessfulPacketRadio;
+    Radio_Number_t transmittingRadio;
+    Radio_Number_t GetProcessingPacketRadio() { return processingPacketRadio; }
+    Radio_Number_t GetLastSuccessfulPacketRadio() { return lastSuccessfulPacketRadio; }
+    Radio_Number_t GetLastTransmitRadio() {return transmittingRadio; }
 
     /////////////Packet Stats//////////
     int8_t LastPacketRSSI;

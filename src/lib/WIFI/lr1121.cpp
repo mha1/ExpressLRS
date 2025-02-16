@@ -18,7 +18,7 @@
 struct lr1121UpdateState_s {
     size_t expectedFilesize;
     size_t totalSize;
-    SX12XX_Radio_Number_t updatingRadio;
+    Radio_Number_t updatingRadio;
     size_t left_over;
     struct {
         uint8_t header[6];
@@ -47,11 +47,11 @@ static void writeLR1121Bytes(uint8_t *data, uint32_t data_size) {
     DBGLN("flashing %x at %x", write_size, lr1121UpdateState->totalSize);
 
     // Have to do this the OLD way, so we can pump out more than 64 bytes in one message
-    digitalWrite(lr1121UpdateState->updatingRadio == SX12XX_Radio_1 ? GPIO_PIN_NSS : GPIO_PIN_NSS_2, LOW);
+    digitalWrite(lr1121UpdateState->updatingRadio == Radio_1 ? GPIO_PIN_NSS : GPIO_PIN_NSS_2, LOW);
     SPIEx.transferBytes(lr1121UpdateState->packet.header, nullptr, 6 + write_size);
-    digitalWrite(lr1121UpdateState->updatingRadio == SX12XX_Radio_1 ? GPIO_PIN_NSS : GPIO_PIN_NSS_2, HIGH);
+    digitalWrite(lr1121UpdateState->updatingRadio == Radio_1 ? GPIO_PIN_NSS : GPIO_PIN_NSS_2, HIGH);
 
-    while (digitalRead(lr1121UpdateState->updatingRadio == SX12XX_Radio_1 ? GPIO_PIN_BUSY : GPIO_PIN_BUSY_2) == HIGH)
+    while (digitalRead(lr1121UpdateState->updatingRadio == Radio_1 ? GPIO_PIN_BUSY : GPIO_PIN_BUSY_2) == HIGH)
     {
         delay(1);
     }
@@ -60,7 +60,7 @@ static void writeLR1121Bytes(uint8_t *data, uint32_t data_size) {
     DBGLN("flashed");
 }
 
-static void readRegister(SX12XX_Radio_Number_t radio, uint16_t reg, uint8_t *buffer, uint32_t buffer_len)
+static void readRegister(Radio_Number_t radio, uint16_t reg, uint8_t *buffer, uint32_t buffer_len)
 {
     uint8_t read[5];
     read[0] = reg >> 8;
@@ -176,8 +176,8 @@ static void WebUploadLR1121DataHandler(AsyncWebServerRequest *request, const Str
         lr1121UpdateState->left_over = 0;
         SPIEx.setHwCs(false);
 
-        pinMode(lr1121UpdateState->updatingRadio == SX12XX_Radio_1 ? GPIO_PIN_NSS : GPIO_PIN_NSS_2, OUTPUT);
-        digitalWrite(lr1121UpdateState->updatingRadio == SX12XX_Radio_1 ? GPIO_PIN_NSS : GPIO_PIN_NSS_2, HIGH);
+        pinMode(lr1121UpdateState->updatingRadio == Radio_1 ? GPIO_PIN_NSS : GPIO_PIN_NSS_2, OUTPUT);
+        digitalWrite(lr1121UpdateState->updatingRadio == Radio_1 ? GPIO_PIN_NSS : GPIO_PIN_NSS_2, HIGH);
     }
     if (len) {
         DBGLN("writing %x", len);
@@ -194,7 +194,7 @@ static void WebUploadLR1121DataHandler(AsyncWebServerRequest *request, const Str
     }
 }
 
-static void ReadStatusForRadio(JsonObject json, SX12XX_Radio_Number_t radio)
+static void ReadStatusForRadio(JsonObject json, Radio_Number_t radio)
 {
     uint8_t packet[9];
     readRegister(radio, LR11XX_BL_GET_VERSION_OC, packet, 5);
@@ -220,10 +220,10 @@ static void GetLR1121Status(AsyncWebServerRequest *request)
     hal.init();
     hal.reset();
 
-    ReadStatusForRadio(json["radio1"].to<JsonObject>(), SX12XX_Radio_1);
+    ReadStatusForRadio(json["radio1"].to<JsonObject>(), Radio_1);
     if (GPIO_PIN_NSS_2 != UNDEF_PIN)
     {
-        ReadStatusForRadio(json["radio2"].to<JsonObject>(), SX12XX_Radio_2);
+        ReadStatusForRadio(json["radio2"].to<JsonObject>(), Radio_2);
     }
     response->setLength();
     request->send(response);
