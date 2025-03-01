@@ -351,7 +351,7 @@ void SetRFLinkRate(uint8_t index, bool bindMode) // Set speed of RF link
     checkGeminiMode();
     if (geminiMode)
     {
-        Radio.SetFrequencyReg(FHSSgetInitialGeminiFreq(), SX12XX_Radio_2);
+        Radio.SetFrequencyReg(FHSSgetInitialGeminiFreq(), SX12XX_Radio_2, false);
     }
 
     OtaUpdateSerializers(smWideOr8ch, ModParams->PayloadLength);
@@ -384,20 +384,20 @@ bool ICACHE_RAM_ATTR HandleFHSS()
     {
         if ((((OtaNonce + 1)/ExpressLRS_currAirRate_Modparams->FHSShopInterval) % 2 == 0) || FHSSuseDualBand) // When in DualBand do not switch between radios.  The OTA modulation parameters and HighFreq/LowFreq Tx amps are set during Config.
         {
-            Radio.SetFrequencyReg(FHSSgetNextFreq(), SX12XX_Radio_1);
-            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), SX12XX_Radio_2);
+            Radio.SetFrequencyReg(FHSSgetNextFreq(), SX12XX_Radio_1, false);
+            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), SX12XX_Radio_2, false);
         }
         else
         {
             // Write radio1 first. This optimises the SPI traffic order.
             uint32_t freqRadio2 = FHSSgetNextFreq();
-            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), SX12XX_Radio_1);
-            Radio.SetFrequencyReg(freqRadio2, SX12XX_Radio_2);
+            Radio.SetFrequencyReg(FHSSgetGeminiFreq(), SX12XX_Radio_1, false);
+            Radio.SetFrequencyReg(freqRadio2, SX12XX_Radio_2, false);
         }
     }
     else
     {
-        Radio.SetFrequencyReg(FHSSgetNextFreq());
+        Radio.SetFrequencyReg(FHSSgetNextFreq(), SX12XX_Radio_All, false);
     }
 
 #if defined(RADIO_SX127X)
