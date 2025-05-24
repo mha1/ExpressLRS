@@ -27,10 +27,10 @@ using namespace std;
 
 enum action_e
 {
-    NO_MATCH,   // skip to the next message in the queue
-    IGNORE,     // the message matches; ignore the new one
-    OVERWRITE,  // overwrite the queued message with the new one
-    APPEND      // append the message to the end of the queue
+    ACTION_NEXT,       // skip to the next message in the queue
+    ACTION_IGNORE,     // the message matches; ignore the new one
+    ACTION_OVERWRITE,  // overwrite the queued message with the new one
+    ACTION_APPEND      // append the message to the end of the queue
 };
 
 typedef std::function<action_e(const crsf_header_t *newMessage, FIFO<2048> &payloads, uint16_t queuePosition)> comparator_t;
@@ -40,9 +40,9 @@ static action_e sourceId(const crsf_header_t *newMessage, FIFO<2048> &payloads, 
 {
     if (payloads[queuePosition + CRSF_TELEMETRY_TYPE_INDEX + 1] == ((uint8_t*)newMessage)[CRSF_TELEMETRY_TYPE_INDEX + 1])
     {
-        return OVERWRITE;
+        return ACTION_OVERWRITE;
     }
-    return APPEND;
+    return ACTION_NEXT;
 }
 
 // Comparator for Ardupilot Status Text message
@@ -51,9 +51,9 @@ static action_e statusText(const crsf_header_t *newMessage, FIFO<2048> &payloads
     if (payloads[queuePosition + CRSF_TELEMETRY_TYPE_INDEX + 1] == CRSF_AP_CUSTOM_TELEM_STATUS_TEXT &&
     ((uint8_t*)newMessage)[CRSF_TELEMETRY_TYPE_INDEX + 1] == CRSF_AP_CUSTOM_TELEM_STATUS_TEXT)
     {
-        return OVERWRITE;
+        return ACTION_OVERWRITE;
     }
-    return APPEND;
+    return ACTION_NEXT;
 }
 
 static std::map<crsf_frame_type_e, comparator_t> comparators = {
@@ -286,7 +286,7 @@ bool Telemetry::AppendTelemetryPackage(uint8_t *package)
     const uint8_t messageSize = CRSF_FRAME_SIZE(package[CRSF_TELEMETRY_LENGTH_INDEX]);
 
     // If this message has a comparator, then find out how we should handle this message
-    auto action = APPEND;
+    auto action = ACTION_APPEND;
     const auto comparator = comparators.find(header->type);
     uint16_t messagePosition = 0;
     if (comparator != comparators.end())
@@ -295,10 +295,10 @@ bool Telemetry::AppendTelemetryPackage(uint8_t *package)
         {
             const auto size = messagePayloads[i];
             // If the message at this point in the queue is not deleted, and it matches this comparator, then we check it
-            if (!(size & bit(7)) && messagePayloads[i+1+CRSF_TELEMETRY_TYPE_INDEX] == header->type)
+            if (!(size & bit(7)) && messagePayloads[i + 1 + CRSF_TELEMETRY_TYPE_INDEX] == header->type)
             {
-                const auto whatToDo = comparator->second == nullptr ? OVERWRITE : comparator->second(header, messagePayloads, i+1);
-                if (whatToDo == IGNORE || whatToDo == APPEND || whatToDo == OVERWRITE)
+                const auto whatToDo = comparator->second == nullptr ? ACTION_OVERWRITE : comparator->second(header, messagePayloads, i + 1);
+                if (whatToDo == ACTION_IGNORE || whatToDo == ACTION_APPEND || whatToDo == ACTION_OVERWRITE)
                 {
                     messagePosition = i;
                     action = whatToDo;
@@ -312,9 +312,9 @@ bool Telemetry::AppendTelemetryPackage(uint8_t *package)
     messagePayloads.lock();
     switch (action)
     {
-    case IGNORE:
+    case ACTION_IGNORE:
         break;
-    case OVERWRITE:
+    case ACTION_OVERWRITE:
         if (messagePayloads[messagePosition] >= messageSize)
         {
             for (uint16_t i = 0 ; i<messageSize; i++)
@@ -332,6 +332,11 @@ bool Telemetry::AppendTelemetryPackage(uint8_t *package)
         {
             messagePayloads.push(messageSize);
             messagePayloads.pushBytes(package, messageSize);
+        }
+        else
+        {
+            messagePayloads.unlock();
+            return false;
         }
         break;
     }
