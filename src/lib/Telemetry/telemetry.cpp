@@ -48,8 +48,6 @@ static action_e statusText(const crsf_header_t *newMessage, const FIFO<2048> &pa
     return ACTION_NEXT;
 }
 
-static int settingsCount = 0;
-
 static std::map<crsf_frame_type_e, comparator_t> comparators = {
     {CRSF_FRAMETYPE_GPS, nullptr},
     {CRSF_FRAMETYPE_VARIO, nullptr},
@@ -63,6 +61,12 @@ static std::map<crsf_frame_type_e, comparator_t> comparators = {
     {CRSF_FRAMETYPE_FLIGHT_MODE, nullptr},
     {CRSF_FRAMETYPE_ARDUPILOT_RESP, statusText},
 };
+
+static int settingsCount = 0;
+inline bool isPrioritised(const crsf_frame_type_e frameType)
+{
+    return frameType >= CRSF_FRAMETYPE_DEVICE_PING && frameType <= CRSF_FRAMETYPE_PARAMETER_WRITE;
+}
 
 Telemetry::Telemetry()
 {
@@ -295,7 +299,7 @@ bool Telemetry::AppendTelemetryPackage(uint8_t *package)
             i += 1 + (size & 0x7f);
         }
     }
-    else if (header->type == CRSF_FRAMETYPE_PARAMETER_SETTINGS_ENTRY)
+    else if (isPrioritised(header->type))
     {
         settingsCount++;
     }
@@ -344,7 +348,7 @@ bool Telemetry::GetNextPayload(uint8_t* nextPayloadSize, uint8_t **payloadData)
         {
             const auto size = messagePayloads[i];
             // If the message at this point in the queue is not deleted, and it's a SETTINGS_ENTRY then we're going to return it
-            if (!(size & bit(7)) && messagePayloads[i + 1 + CRSF_TELEMETRY_TYPE_INDEX] == CRSF_FRAMETYPE_PARAMETER_SETTINGS_ENTRY)
+            if (!(size & bit(7)) && isPrioritised((crsf_frame_type_e)messagePayloads[i + 1 + CRSF_TELEMETRY_TYPE_INDEX]))
             {
                 settingsCount--;
                 // Copy the frame to the current payload
