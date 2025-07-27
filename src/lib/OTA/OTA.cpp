@@ -18,6 +18,7 @@ bool OtaIsFullRes;
 volatile uint8_t OtaNonce;
 uint16_t OtaCrcInitializer;
 OtaSwitchMode_e OtaSwitchModeCurrent;
+extern TxTlmRcvPhase_e TelemetryRcvPhase;
 
 // CRC
 static Crc2Byte ota_crc;
@@ -490,10 +491,29 @@ bool ICACHE_RAM_ATTR UnpackChannelData8ch(OTA_Packet_s const * const otaPktPtr, 
 }
 #endif
 
+// CRC validation helper function to detect and resolve situations where an out of sync RX is not properly disconnecting
+uint16_t ICACHE_RAM_ATTR NonceInit(bool isPacketTypeSync)
+{
+    // if it's a SYNC packet don't adjust the CRC initializer
+    if (isPacketTypeSync)
+    {
+        return 0;
+    }
+
+#if defined(TARGET_TX)
+    // use the nonce which may already have been advanded by the TOCK timer ISR
+    return (TelemetryRcvPhase == ttrpPreReceiveGap) ? OtaNonce : OtaNonce-1;
+#else
+    // use the nonce as is to adjust the CRC initializer
+    return OtaNonce;
+#endif
+}
+
 bool ICACHE_RAM_ATTR ValidatePacketCrcFull(OTA_Packet_s * const otaPktPtr)
 {
+    // validate a CRC with adjusted OtaCrcInitializer to detect and resolve situations where an out of sync RX is not properly disconnecting
     uint16_t const calculatedCRC =
-        ota_crc.calc((uint8_t*)otaPktPtr, OTA8_CRC_CALC_LEN, OtaCrcInitializer);
+        ota_crc.calc((uint8_t*)otaPktPtr, OTA8_CRC_CALC_LEN, OtaCrcInitializer ^ NonceInit(otaPktPtr->std.type == PACKET_TYPE_SYNC));
     return otaPktPtr->full.crc == calculatedCRC;
 }
 
@@ -514,8 +534,9 @@ bool ICACHE_RAM_ATTR ValidatePacketCrcStd(OTA_Packet_s * const otaPktPtr)
     {
         otaPktPtr->std.crcHigh = 0;
     }
+    // validate a CRC with adjusted OtaCrcInitializer to detect and resolve situations where an out of sync RX is not properly disconnecting
     uint16_t const calculatedCRC =
-        ota_crc.calc((uint8_t*)otaPktPtr, OTA4_CRC_CALC_LEN, OtaCrcInitializer);
+        ota_crc.calc((uint8_t*)otaPktPtr, OTA4_CRC_CALC_LEN, OtaCrcInitializer ^ NonceInit(otaPktPtr->std.type == PACKET_TYPE_SYNC));
 
     otaPktPtr->std.crcHigh = backupCrcHigh;
     
@@ -524,7 +545,9 @@ bool ICACHE_RAM_ATTR ValidatePacketCrcStd(OTA_Packet_s * const otaPktPtr)
 
 void ICACHE_RAM_ATTR GeneratePacketCrcFull(OTA_Packet_s * const otaPktPtr)
 {
-    otaPktPtr->full.crc = ota_crc.calc((uint8_t*)otaPktPtr, OTA8_CRC_CALC_LEN, OtaCrcInitializer);
+    // validate a CRC with adjusted OtaCrcInitializer to detect and resolve situations where an out of sync RX is not properly disconnecting
+    uint16_t nonceInit = (otaPktPtr->std.type == PACKET_TYPE_SYNC) ? 0 : OtaNonce;
+    otaPktPtr->full.crc = ota_crc.calc((uint8_t*)otaPktPtr, OTA8_CRC_CALC_LEN, OtaCrcInitializer ^ nonceInit);
 }
 
 void ICACHE_RAM_ATTR GeneratePacketCrcStd(OTA_Packet_s * const otaPktPtr)
@@ -536,7 +559,9 @@ void ICACHE_RAM_ATTR GeneratePacketCrcStd(OTA_Packet_s * const otaPktPtr)
         otaPktPtr->std.crcHigh = (OtaNonce % ExpressLRS_currAirRate_Modparams->FHSShopInterval) + 1;
     }
 #endif
-    uint16_t crc = ota_crc.calc((uint8_t*)otaPktPtr, OTA4_CRC_CALC_LEN, OtaCrcInitializer);
+    // validate a CRC with adjusted OtaCrcInitializer to detect and resolve situations where an out of sync RX is not properly disconnecting
+    uint16_t nonceInit = (otaPktPtr->std.type == PACKET_TYPE_SYNC) ? 0 : OtaNonce;
+    uint16_t crc = ota_crc.calc((uint8_t*)otaPktPtr, OTA4_CRC_CALC_LEN, OtaCrcInitializer ^ nonceInit);
     otaPktPtr->std.crcHigh = (crc >> 8);
     otaPktPtr->std.crcLow  = crc;
 }
