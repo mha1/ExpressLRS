@@ -11,8 +11,10 @@ static uint32_t rxStartTime;
   #define LBT_RSSI_THRESHOLD_OFFSET_DB 0
 #endif
 
-static bool LBTEnabled = false;
+bool LBTEnabled = false;
 static uint32_t validRSSIdelayUs = 0;
+
+uint32_t getRXWaitTime() { return validRSSIdelayUs; }
 
 static uint32_t ICACHE_RAM_ATTR SpreadingFactorToRSSIvalidDelayUs(uint8_t SF, uint8_t radio_type)
 {
@@ -30,7 +32,7 @@ static uint32_t ICACHE_RAM_ATTR SpreadingFactorToRSSIvalidDelayUs(uint8_t SF, ui
   }
   if (radio_type == RADIO_TYPE_LR1121_GFSK_2G4)
   {
-    return 20; // 20us settling time (seems fine when testing)
+    return 40; // 40us settling time; documentation says Twait for 467 kHz bandwidth is 30.68us
   }
 #elif defined(RADIO_SX128X)
   // The necessary wait time from RX start to valid instant RSSI reading
@@ -146,16 +148,6 @@ void ICACHE_RAM_ATTR SetClearChannelAssessmentTime(void)
 {
   if (!LBTEnabled)
     return;
-
-#if defined(TARGET_TX)
-#if defined(RADIO_LR1121)
-  Radio.RXnb(LR1121_MODE_RX, validRSSIdelayUs);
-#elif defined(RADIO_SX128X)
-  Radio.RXnb(SX1280_MODE_RX, validRSSIdelayUs);
-#else
-#error No continuous receive mode defined for this radio type
-#endif
-#endif
 
   rxStartTime = micros();
 }
