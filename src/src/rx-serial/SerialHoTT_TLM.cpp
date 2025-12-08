@@ -16,17 +16,17 @@
 
 #define DISCOVERY_TIMEOUT 30000 // 30s device discovery time
 
-#define VARIO_MIN_CRSFRATE 1000 // CRSF telemetry packets will be sent if
-#define GPS_MIN_CRSFRATE 5000   // min rate timers in [ms] have expired
-#define BATT_MIN_CRSFRATE 5000  // or packet value has changed. Fastest to
+#define VARIO_MIN_CRSFRATE 500  // CRSF telemetry packets will be sent if
+#define GPS_MIN_CRSFRATE 500    // min rate timers in [ms] have expired
+#define BATT_MIN_CRSFRATE 500   // or packet value has changed. Fastest to
                                 // be expected update rate will by about 150ms due
                                 // to HoTT bus speed if only a HoTT Vario is connected and
                                 // values change every HoTT bus poll cycle.
-#define TEMP_MIN_CRSFRATE 5000
-#define RPM_MIN_CRSFRATE 5000
-#define CELLS_MIN_CRSFRATE 5000
-#define VOLT_MIN_CRSFRATE 5000
-#define AIRSPEED_MIN_CRSFRATE 5000
+#define TEMP_MIN_CRSFRATE 500
+#define RPM_MIN_CRSFRATE 500
+#define CELLS_MIN_CRSFRATE 500
+#define VOLT_MIN_CRSFRATE 500
+#define AIRSPEED_MIN_CRSFRATE 500
 
 constexpr uint8_t SIZE_8BIT = 1;
 constexpr uint8_t SIZE_16BIT = 2;
