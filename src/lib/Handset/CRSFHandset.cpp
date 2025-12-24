@@ -105,6 +105,10 @@ void CRSFHandset::flush_port_input()
     }
 }
 
+#include "crc.h"
+
+GENERIC_CRC8 crsf_crc = GENERIC_CRC8(CRSF_CRC_POLY);
+
 void CRSFHandset::forwardMessage(const crsf_header_t *message)
 {
     if (controllerConnected)
@@ -124,6 +128,16 @@ void CRSFHandset::forwardMessage(const crsf_header_t *message)
             // See https://github.com/tbs-fpv/tbs-crsf-spec/blob/main/crsf.md#frame-details
             data[0] = CRSF_SYNC_BYTE;
             SerialOutFIFO.push(size); // length
+
+            if (message->type == CRSF_FRAMETYPE_LINK_STATISTICS)
+            {
+                static uint8_t cnt = 0;                         // counter for sent linkstats packets
+
+                data[7] = ++cnt;                                // write counter to antenna
+
+                data[size-1] = crsf_crc.calc(&data[2], size-3); // update crc
+            }
+
             SerialOutFIFO.pushBytes(data, size);
         }
         SerialOutFIFO.unlock();

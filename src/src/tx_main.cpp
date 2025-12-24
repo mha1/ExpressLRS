@@ -1390,9 +1390,10 @@ static void cyclePower()
   }
 }
 
+bool forceLinkstatsPush = false;
 static void checkSendLinkStatsToHandset(uint32_t now)
 {
-  if ((now - LinkStatsLastReported_Ms) > firmwareOptions.tlm_report_interval)
+  if (forceLinkstatsPush || (now - LinkStatsLastReported_Ms) > firmwareOptions.tlm_report_interval)
   {
     uint8_t linkStatisticsFrame[CRSF_FRAME_NOT_COUNTED_BYTES + CRSF_FRAME_SIZE(sizeof(crsfLinkStatistics_t))];
 
@@ -1401,6 +1402,7 @@ static void checkSendLinkStatsToHandset(uint32_t now)
     crsfRouter.deliverMessage(&otaConnector, (crsf_header_t *)linkStatisticsFrame);
     sendCRSFTelemetryToBackpack(linkStatisticsFrame);
     LinkStatsLastReported_Ms = now;
+    forceLinkstatsPush = false;
   }
 }
 
