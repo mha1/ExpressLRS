@@ -201,8 +201,10 @@ typedef struct crsf_channels_s
 /**
  * Bits used in the byte following crsf_channels_t in the ExpressLRS extended CHANNELS_PACKED packet
  */
-#define CRSF_CHANNELS_STATUS_FLAG_ARM       bit(0)
-#define CRSF_CHANNELS_STATUS_FLAG_CRCERR    bit(1)
+#define CRSF_CHANNELS_STATUS_ARMING_MODE_SWITCH           0b11
+#define CRSF_CHANNELS_STATUS_FLAG_ARMING_MODE_SWITCH      bit(0)
+#define CRSF_CHANNELS_STATUS_ARMING_MODE_CH5              bit(1)
+#define CRSF_CHANNELS_STATUS_FLAG_CRCERR                  bit(2)
 
 typedef struct deviceInformationPacket_s
 {
