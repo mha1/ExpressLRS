@@ -201,10 +201,9 @@ typedef struct crsf_channels_s
 /**
  * Bits used in the byte following crsf_channels_t in the ExpressLRS extended CHANNELS_PACKED packet
  */
-#define CRSF_CHANNELS_STATUS_ARMING_MODE_SWITCH           0b11
-#define CRSF_CHANNELS_STATUS_FLAG_ARMING_MODE_SWITCH      bit(0)
-#define CRSF_CHANNELS_STATUS_ARMING_MODE_CH5              bit(1)
-#define CRSF_CHANNELS_STATUS_FLAG_CRCERR                  bit(2)
+#define CRSF_CHANNELS_STATUS_FLAG_ARMING_MODE_SWITCH_ARMED  0b01      // Arm using Switch with switch set to armed
+#define CRSF_CHANNELS_STATUS_ARMING_MODE_CH5                bit(1)    // Arm using CH5 if bit is set
+#define CRSF_CHANNELS_STATUS_FLAG_CRCERR                    bit(2)    // EdgeTX reports a crsf error if bit is set
 
 typedef struct deviceInformationPacket_s
 {

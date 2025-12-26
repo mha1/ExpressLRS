@@ -2,6 +2,8 @@
 #define TX_MODULE_ENDPOINT_H
 #include "CRSFEndpoint.h"
 
+extern bool forceLinkstatsPush;
+
 enum warningFlags
 {
     // bit 0 and 1 are status flags, show up as the little icon in the lua top right corner

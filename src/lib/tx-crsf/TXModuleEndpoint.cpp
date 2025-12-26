@@ -135,9 +135,8 @@ void TXModuleEndpoint::RcPacketToChannelsData(const crsf_header_t *message) // d
         }
         else
         {
-            armCmd = (payload[readByteIndex] & CRSF_CHANNELS_STATUS_ARMING_MODE_SWITCH) & CRSF_CHANNELS_STATUS_FLAG_ARMING_MODE_SWITCH;
+            armCmd = (payload[readByteIndex] & CRSF_CHANNELS_STATUS_FLAG_ARMING_MODE_SWITCH_ARMED);
 
-            extern bool forceLinkstatsPush;
             forceLinkstatsPush = forceLinkstatsPush || (payload[readByteIndex] & CRSF_CHANNELS_STATUS_FLAG_CRCERR);            
         }
     }
