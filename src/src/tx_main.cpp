@@ -717,6 +717,8 @@ static void UARTdisconnected()
 {
   hwTimer::stop();
   setConnectionState(noCrossfire);
+  // Since not going from connected -> disconnected, set LQ=0 to make sure the handset knows we stopped TXing when it comes back
+  linkStats.uplink_Link_quality = 0;
 }
 
 static void UARTconnected()
@@ -1572,7 +1574,7 @@ void loop()
 #if defined(RADIO_LR1121)
     // Send half of the bind packets on the 2.4GHz domain
     if (BindingSendCount == BindingSpamAmount / 2) {
-      SetRFLinkRate(RATE_DUALBAND_BINDING);
+      SetRFLinkRate(enumRatetoIndex(RATE_DUALBAND_BINDING));
       // Increment BindingSendCount so that SetRFLinkRate is only called once.
       BindingSendCount++;
     }
