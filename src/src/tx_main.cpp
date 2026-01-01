@@ -1393,11 +1393,16 @@ static void cyclePower()
 }
 
 bool forceLinkstatsPush = false;
+uint8_t lspcntr = 0;
 
 static void checkSendLinkStatsToHandset(uint32_t now)
 {
   if ((forceLinkstatsPush && ((now - LinkStatsLastReported_Ms) > 20)) || ((now - LinkStatsLastReported_Ms) > firmwareOptions.tlm_report_interval))
   {
+    if (forceLinkstatsPush) {
+      lspcntr++;
+      DBGLN("%u %d", millis, lspcntr);
+    }
     uint8_t linkStatisticsFrame[CRSF_FRAME_NOT_COUNTED_BYTES + CRSF_FRAME_SIZE(sizeof(crsfLinkStatistics_t))];
 
     crsfRouter.makeLinkStatisticsPacket(linkStatisticsFrame);
