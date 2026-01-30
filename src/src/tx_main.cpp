@@ -442,7 +442,7 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
   OtaSwitchMode_e newSwitchMode = (OtaSwitchMode_e)config.GetSwitchMode();
 
   bool subGHz = FHSSconfig->freq_center < 1000000000;
-#if defined(RADIO_LR1121)
+#if defined(RADIO_LR1121) || defined(RADIO_LR2021)
   if (FHSSuseDualBand && subGHz)
   {
       subGHz = FHSSconfigDualBand->freq_center < 1000000000;
@@ -463,7 +463,7 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
 #endif
   hwTimer::updateInterval(interval);
 
-#if defined(RADIO_LR1121)
+#if defined(RADIO_LR1121) || defined(RADIO_LR2021)
   FHSSusePrimaryFreqBand = !(ModParams->radio_type == RADIO_MODULATION_LORA_2G4) && !(ModParams->radio_type == RADIO_MODULATION_GFSK_2G4);
   FHSSuseDualBand = ModParams->radio_type == RADIO_MODULATION_LORA_DUAL;
 #endif
@@ -473,12 +473,12 @@ void SetRFLinkRate(uint8_t index) // Set speed of RF link
 #if defined(RADIO_SX128X)
                , uidMacSeedGet(), OtaCrcInitializer, (ModParams->radio_type == RADIO_MODULATION_FLRC_2G4)
 #endif
-#if defined(RADIO_LR1121)
+#if defined(RADIO_LR1121) || defined(RADIO_LR2021)
                , (ModParams->radio_type == RADIO_MODULATION_GFSK_900 || ModParams->radio_type == RADIO_MODULATION_GFSK_2G4), (uint8_t)UID[5], (uint8_t)UID[4]
 #endif
                );
 
-#if defined(RADIO_LR1121)
+#if defined(RADIO_LR1121) || defined(RADIO_LR2021)
   if (FHSSuseDualBand)
   {
     Radio.Config(ModParams->bw2, ModParams->sf2, ModParams->cr2, FHSSgetInitialGeminiFreq(),
@@ -1566,7 +1566,7 @@ void loop()
   // only send Uplink data when binding is not active
   if (InBindingMode)
   {
-#if defined(RADIO_LR1121)
+#if defined(RADIO_LR1121) || defined(RADIO_LR2021)
     // Send half of the bind packets on the 2.4GHz domain
     if (BindingSendCount == BindingSpamAmount / 2) {
       SetRFLinkRate(enumRatetoIndex(RATE_DUALBAND_BINDING));
