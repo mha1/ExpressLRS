@@ -64,18 +64,18 @@ uint32_t SerialSBUS::sendRCFrame(bool frameAvailable, bool frameMissed, uint32_t
         PackedRCdataOut.ch1 = channelData[1];
         PackedRCdataOut.ch2 = channelData[2];
         PackedRCdataOut.ch3 = channelData[3];
-        PackedRCdataOut.ch4 = channelData[8];   // remapped to ETX CH9 to SBUS CH5
+        PackedRCdataOut.ch4 = channelData[15];   // ETX CH16 remapped to SBUS CH5
         PackedRCdataOut.ch5 = channelData[5];
         PackedRCdataOut.ch6 = channelData[6];
         PackedRCdataOut.ch7 = channelData[7];
-        PackedRCdataOut.ch8 = channelData[4];   // remapped to ETX CH5 to SBUS CH9
+        PackedRCdataOut.ch8 = channelData[8];
         PackedRCdataOut.ch9 = channelData[9];
         PackedRCdataOut.ch10 = channelData[10];
         PackedRCdataOut.ch11 = channelData[11];
         PackedRCdataOut.ch12 = channelData[12];
         PackedRCdataOut.ch13 = channelData[13];
         PackedRCdataOut.ch14 = channelData[14];
-        PackedRCdataOut.ch15 = channelData[15];
+        PackedRCdataOut.ch15 = channelData[4];	 // ETX CH5 remapped to SBUS CH16
     }
 
     uint8_t extraData = 0;
