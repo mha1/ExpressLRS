@@ -299,7 +299,7 @@ extern SX1280Driver Radio;
 extern LR1121Driver Radio;
 
 #elif defined(RADIO_LR2021)
-#define RATE_MAX 20
+#define RATE_MAX 24
 #define RATE_BINDING RATE_LORA_900_50HZ
 #define RATE_DUALBAND_BINDING RATE_LORA_2G4_50HZ
 
@@ -312,9 +312,9 @@ expresslrs_mod_settings_s *get_elrs_airRateConfig(uint8_t index);
 expresslrs_rf_pref_params_s *get_elrs_RFperfParams(uint8_t index);
 uint8_t get_elrs_HandsetRate_max(uint8_t rateIndex, uint32_t minInterval);
 
-uint8_t TLMratioEnumToValue(expresslrs_tlm_ratio_e const enumval);
-uint8_t TLMBurstMaxForRateRatio(uint16_t const rateHz, uint8_t const ratioDiv);
-uint8_t enumRatetoIndex(expresslrs_RFrates_e const eRate);
+uint8_t TLMratioEnumToValue(expresslrs_tlm_ratio_e enumval);
+uint8_t TLMBurstMaxForRateRatio(uint16_t rateHz, uint8_t ratioDiv);
+uint8_t enumRatetoIndex(expresslrs_RFrates_e eRate);
 
 extern uint8_t UID[UID_LEN];
 extern bool connectionHasModelMatch;
