@@ -74,7 +74,7 @@ def appendToFirmware(firmware_file, product_name, lua_name, defines, config, lay
         firmware_file.write(config['prior_target_name'].upper().encode())
         firmware_file.write(b'\0')
 
-def doConfiguration(file, defines, config, moduletype, frequency, platform, device_name, rx_as_tx):
+def doConfiguration(file, defines, config, firmware, device_name, rx_as_tx):
     product_name = "Unified"
     lua_name = "Unified"
     layout = None
@@ -92,15 +92,8 @@ def doConfiguration(file, defines, config, moduletype, frequency, platform, devi
         print('You will be able to configure the hardware via the web UI on the device.')
     else:
         products = []
-        for k in jmespath.search(f'[*."{moduletype}_{frequency}".*][][?platform==`{platform}`][]', targets):
+        for k in jmespath.search(f'*.*.*[][]|[?firmware==`{firmware}`]', targets):
             products.append(k)
-        if frequency == 'dual':
-            for k in jmespath.search(f'[*."{moduletype}_2400".*][][?platform==`{platform}`][]', targets):
-                if '_LR1121_' in k['firmware']:
-                    products.append(k)
-            for k in jmespath.search(f'[*."{moduletype}_900".*][][?platform==`{platform}`][]', targets):
-                if '_LR1121_' in k['firmware']:
-                    products.append(k)
         # Sort the list by product name, case insensitive, and print the list
         products = sorted(products, key=lambda p: p['product_name'].casefold())
         for i, p in enumerate(products):
@@ -113,7 +106,7 @@ def doConfiguration(file, defines, config, moduletype, frequency, platform, devi
     if config is not None:
         product_name = config['product_name']
         lua_name = config['lua_name']
-        dir = 'TX' if moduletype == 'tx' else 'RX'
+        dir = 'TX' if '_TX' in config['firmware'] else 'RX'
         layout = f"hardware/{dir}/{config['layout_file']}"
 
     lua_name = lua_name if device_name is None else device_name
@@ -126,28 +119,11 @@ def appendConfiguration(source, target, env):
     if 'UNIFIED_' not in target_name and config is None:
         return
 
-    moduletype = ''
-    frequency = ''
-    if config is not None:
-        moduletype = 'tx' if '.tx_' in config else 'rx'
-        frequency = '2400' if '_2400.' in config else '900' if '_900.' in config else 'dual'
-    else:
-        moduletype = 'tx' if '_TX_' in target_name else 'rx'
-        frequency = '2400' if '_2400_' in target_name else '900' if '_900_' in target_name else 'dual'
-
-    if env.get('PIOPLATFORM', '') == 'espressif32':
-        platform = 'esp32'
-        if 'esp32-s3' in env.get('BOARD', ''):
-            platform = 'esp32-s3'
-        elif 'esp32-c3' in env.get('BOARD', ''):
-            platform = 'esp32-c3'
-    else:
-        platform = 'esp8285'
-
+    firmware = env.get('PIOENV', '').split("_via")[0]
     defines = json.JSONEncoder().encode(env['OPTIONS_JSON'])
 
     with open(str(target[0]), "r+b") as firmware_file:
-        doConfiguration(firmware_file, defines, config, moduletype, frequency, platform, device_name, None)
+        doConfiguration(firmware_file, defines, config, firmware, device_name, None)
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Configure Unified Firmware")
@@ -162,15 +138,13 @@ if __name__ == '__main__':
     with open('hardware/targets.json') as f:
         targets = json.load(f)
 
-    moduletype = 'tx' if '.tx_' in args.target else 'rx'
-
     config ='.'.join(map(lambda s: f'"{s}"', args.target.split('.')))
     config = jmespath.search(config, targets)
 
     if config is not None:
         product_name = config['product_name']
         lua_name = config['lua_name']
-        dir = 'TX' if moduletype == 'tx' else 'RX'
+        dir = 'TX' if '_TX' in config['firmware'] else 'RX'
         layout = f"hardware/{dir}/{config['layout_file']}"
 
     appendToFirmware(args.file, product_name, lua_name, args.options, config, layout, None)
