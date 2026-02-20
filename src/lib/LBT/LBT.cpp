@@ -78,7 +78,7 @@ static uint32_t SpreadingFactorToRSSIvalidDelayUs(uint8_t SF, uint8_t radio_type
         default: return 240;
         }
     }
-    if (radio_type == RADIO_MODULATION_GFSK_2G4)
+    if (radio_type == RADIO_MODULATION_GFSK_2G4 || radio_type == RADIO_MODULATION_FLRC_2G4)
     {
         return 40; // 40us settling time; documentation says Twait for 467 kHz bandwidth is 30.68us
     }
@@ -90,7 +90,7 @@ void LbtEnableIfRequired()
 {
     LbtIsEnabled = config.GetPower() > PWR_10mW;
 #if defined(RADIO_LR1121) || defined(RADIO_LR2021)
-    LbtIsEnabled = LbtIsEnabled && (ExpressLRS_currAirRate_Modparams->radio_type == RADIO_MODULATION_LORA_2G4 || ExpressLRS_currAirRate_Modparams->radio_type == RADIO_MODULATION_GFSK_2G4 || ExpressLRS_currAirRate_Modparams->radio_type == RADIO_MODULATION_LORA_DUAL);
+    LbtIsEnabled = LbtIsEnabled && (ExpressLRS_currAirRate_Modparams->radio_type & RADIO_BAND_MASK == RADIO_BAND_2G4 ||  ExpressLRS_currAirRate_Modparams->radio_type & RADIO_BAND_MASK == RADIO_BAND_DUAL);
 #endif
     validRSSIdelayUs = SpreadingFactorToRSSIvalidDelayUs(ExpressLRS_currAirRate_Modparams->sf, ExpressLRS_currAirRate_Modparams->radio_type);
 }
@@ -141,7 +141,7 @@ static int8_t ICACHE_RAM_ATTR PowerEnumToLBTLimit(PowerLevels_e txPower, uint8_t
       default: return -71 + LBT_RSSI_THRESHOLD_OFFSET_DB;
     }
   }
-  if (radio_type == RADIO_MODULATION_GFSK_2G4)
+  if (radio_type == RADIO_MODULATION_GFSK_2G4 || radio_type == RADIO_MODULATION_FLRC_2G4)
   {
     switch(txPower)
     {
