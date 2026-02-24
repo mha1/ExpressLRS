@@ -1012,14 +1012,8 @@ void TXModuleEndpoint::registerParameters()
   }
 
   registerParameter(&luaInfo);
-  if (strlen(version) < 21) {
-    strlcpy(version_domain, version, 21);
-    strlcat(version_domain, " ", sizeof(version_domain));
-  } else {
-    strlcpy(version_domain, version, 18);
-    strlcat(version_domain, "... ", sizeof(version_domain));
-  }
-  strlcat(version_domain, FHSSconfig->domain, sizeof(version_domain));
+
+  setupDomainInfo(version_domain, sizeof(version_domain));
   registerParameter(&luaELRSversion);
 }
 

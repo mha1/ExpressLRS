@@ -161,9 +161,47 @@ void FHSSrandomiseFHSSsequenceBuild(const uint32_t seed, uint32_t freqCount, uin
     // DBGCR;
 }
 
-bool isDomain868()
+void setupDomainInfo(char *version_domain, uint8_t len)
 {
-    return strcmp(FHSSconfig->domain, "EU868") == 0;
+  if (strlen(version) < 21)
+  {
+    strlcpy(version_domain, version, 21);
+    strlcat(version_domain, " ", len);
+  } 
+  else
+  {
+    strlcpy(version_domain, version, 18);
+    strlcat(version_domain, "... ", len);
+  }
+
+#if defined(RADIO_LR1121)
+  if (POWER_OUTPUT_VALUES_COUNT != 0 && POWER_OUTPUT_VALUES_DUAL_COUNT != 0)
+  {
+    strlcat(version_domain, FHSSconfig->domain, len);           // low band 900M
+    strlcat(version_domain, "/", len);
+    strlcat(version_domain, FHSSconfigDualBand->domain, len);   // high band 2.4G
+
+    return;
+  }
+  
+  // low band 900M
+  if (POWER_OUTPUT_VALUES_COUNT != 0)
+  {
+        strlcat(version_domain, FHSSconfig->domain, len);
+        return;
+  }
+
+  // high band 2.4G
+  if (POWER_OUTPUT_VALUES_DUAL_COUNT != 0)
+  {
+        strlcat(version_domain, FHSSconfigDualBand->domain, len);
+        return;
+  }
+
+  return;
+#else
+  strlcat(version_domain, FHSSconfig->domain, len);
+#endif
 }
 
 bool isUsingPrimaryFreqBand()

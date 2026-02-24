@@ -1,6 +1,7 @@
 #include "targets.h"
 #if !defined(UNIT_TEST)
 #include "RXEndpoint.h"
+#include "FHSS.h"
 #include "POWERMGNT.h"
 #include "config.h"
 #include "deferred.h"
@@ -29,6 +30,7 @@ char strPowerLevels[] = "10;25;50;100;250;500;1000;2000;MatchTX ";
 #endif
 static char modelString[] = "000";
 static char pwmModes[] = "50Hz;60Hz;100Hz;160Hz;333Hz;400Hz;10kHzDuty;On/Off;DShot;DShot 3D;Serial RX;Serial TX;I2C SCL;I2C SDA;Serial2 RX;Serial2 TX";
+static char version_domain[20+1+6+1];
 
 static selectionParameter luaSerialProtocol = {
     {"Protocol", CRSF_TEXT_SELECTION},
@@ -116,7 +118,7 @@ static stringParameter luaModelNumber = {
 };
 
 static stringParameter luaELRSversion = {
-    {version, CRSF_INFO},
+    {version_domain, CRSF_INFO},
     commit
 };
 
@@ -576,6 +578,8 @@ void RXEndpoint::registerParameters()
   });
 
   registerParameter(&luaModelNumber);
+
+  setupDomainInfo(version_domain, sizeof(version_domain)); 
   registerParameter(&luaELRSversion);
 }
 
