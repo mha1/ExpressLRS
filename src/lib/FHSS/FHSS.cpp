@@ -161,46 +161,38 @@ void FHSSrandomiseFHSSsequenceBuild(const uint32_t seed, uint32_t freqCount, uin
     // DBGCR;
 }
 
-void setupDomainInfo(char *version_domain, uint8_t len)
+/**
+ * @brief add frequency and regulatory domain to the version string used by the Lua script
+ *
+ * @param version_domain a pointer to a buffer holding the version and extra space for additional data
+ * @param maxlen the size of the provided buffer
+ */
+void addDomainInfo(char *version_domain, uint8_t maxlen)
 {
-  if (strlen(version) < 21)
-  {
-    strlcpy(version_domain, version, 21);
-    strlcat(version_domain, " ", len);
-  } 
-  else
-  {
-    strlcpy(version_domain, version, 18);
-    strlcat(version_domain, "... ", len);
-  }
+    if (strlen(version) < 21)
+    {
+        strlcpy(version_domain, version, 21);
+        strlcat(version_domain, " ", maxlen);
+    } 
+    else
+    {
+        strlcpy(version_domain, version, 18);
+        strlcat(version_domain, "... ", maxlen);
+    }
 
 #if defined(RADIO_LR1121)
-  if (POWER_OUTPUT_VALUES_COUNT != 0 && POWER_OUTPUT_VALUES_DUAL_COUNT != 0)
-  {
-    strlcat(version_domain, FHSSconfig->domain, len);           // low band 900M
-    strlcat(version_domain, "/", len);
-    strlcat(version_domain, FHSSconfigDualBand->domain, len);   // high band 2.4G
+    if (POWER_OUTPUT_VALUES_COUNT != 0)
+    {
+        strlcat(version_domain, FHSSconfig->domain, maxlen);            // subghz
+    }
 
-    return;
-  }
-  
-  // low band 900M
-  if (POWER_OUTPUT_VALUES_COUNT != 0)
-  {
-        strlcat(version_domain, FHSSconfig->domain, len);
-        return;
-  }
+    if (POWER_OUTPUT_VALUES_COUNT != 0 && POWER_OUTPUT_VALUES_DUAL_COUNT != 0)
+        strlcat(version_domain, "/", maxlen);
 
-  // high band 2.4G
-  if (POWER_OUTPUT_VALUES_DUAL_COUNT != 0)
-  {
-        strlcat(version_domain, FHSSconfigDualBand->domain, len);
-        return;
-  }
-
-  return;
+    if (POWER_OUTPUT_VALUES_DUAL_COUNT != 0)
+        strlcat(version_domain, FHSSconfigDualBand->domain, maxlen);    // 2.4GHz
 #else
-  strlcat(version_domain, FHSSconfig->domain, len);
+    strlcat(version_domain, FHSSconfig->domain, maxlen);
 #endif
 }
 
