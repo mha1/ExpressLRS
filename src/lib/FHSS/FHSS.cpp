@@ -180,20 +180,18 @@ void addDomainInfo(char *version_domain, uint8_t maxlen)
         strlcat(version_domain, "... ", maxlen);
     }
 
-#if defined(RADIO_LR1121)
     if (POWER_OUTPUT_VALUES_COUNT != 0)
     {
-        strlcat(version_domain, FHSSconfig->domain, maxlen);            // subghz
+        strlcat(version_domain, FHSSconfig->domain, maxlen);            // single band: subghz or 2.4GHz, dual band: subghz
     }
-
     if (POWER_OUTPUT_VALUES_COUNT != 0 && POWER_OUTPUT_VALUES_DUAL_COUNT != 0)
+    {
         strlcat(version_domain, "/", maxlen);
-
+    }
     if (POWER_OUTPUT_VALUES_DUAL_COUNT != 0)
+    {
         strlcat(version_domain, FHSSconfigDualBand->domain, maxlen);    // 2.4GHz
-#else
-    strlcat(version_domain, FHSSconfig->domain, maxlen);
-#endif
+    }
 }
 
 bool isUsingPrimaryFreqBand()
