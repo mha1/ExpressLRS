@@ -3,6 +3,11 @@
 #include "options.h"
 #include <string.h>
 
+#if defined(UNIT_TEST)
+#define POWER_OUTPUT_VALUES_COUNT 4
+#define POWER_OUTPUT_VALUES_DUAL_COUNT 0
+#endif
+
 #if defined(RADIO_SX127X) || defined(RADIO_LR1121)
 
 #if defined(RADIO_LR1121)
