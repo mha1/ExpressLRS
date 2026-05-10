@@ -211,6 +211,10 @@ static int event()
 {
     if (!OPT_HAS_SERVO_OUTPUT || connectionState == disconnected)
     {
+        newChannelsAvailable = false;
+
+        servosFailsafe();
+
         // Disconnected should come after failsafe on the RX,
         // so it is safe to shut down when disconnected
         return DURATION_NEVER;
