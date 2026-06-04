@@ -134,6 +134,9 @@ void convert_mavlink_to_crsf_telem(crsf_addr_e destination, uint8_t *CRSFinBuffe
                 crsfRouter.SetHeaderAndCrc((crsf_header_t *)&crsfbatt, CRSF_FRAMETYPE_BATTERY_SENSOR, CRSF_FRAME_SIZE(sizeof(crsf_sensor_battery_t)));
                 crsfRouter.deliverMessageTo(destination, &crsfbatt.h);
 
+                // indicate external sensor is present
+                crsfBatterySensorDetected = true;
+
                 // send the batt1 message to Yaapu Telemetry Script
                 ap_send_crsf_passthrough_single(destination, 0x5003, format_batt1(battery_status.voltages[0], battery_status.current_battery, battery_status.current_consumed));
                 break;
