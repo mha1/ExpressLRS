@@ -2,6 +2,7 @@
 #include "options.h"
 #include "helpers.h"
 #include "logging.h"
+#include "POWERMGNT.h"
 #include <LittleFS.h>
 #include <ArduinoJson.h>
 
@@ -285,7 +286,16 @@ bool hardware_flag(nameType name)
 }
 
 int hardware_int(nameType name)
+
 {
+#if defined(RADIO_LR1121) && defined(Regulatory_Domain_EU_868)
+    // EU_868MHz mode not supported for devices with min power > 25mW
+    if (name == HARDWARE_power_values_count && MinPower > PWR_25mW)
+    {
+        return 0;
+    }
+#endif
+
     return hardware[name].int_value;
 }
 
