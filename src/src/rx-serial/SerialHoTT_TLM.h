@@ -289,6 +289,7 @@ private:
     uint8_t URXDinIdx;
 #endif
 
+    void HoTTMainLoop();
     void setTXMode();
     void setRXMode();
 

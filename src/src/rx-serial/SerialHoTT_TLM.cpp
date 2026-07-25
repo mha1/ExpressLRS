@@ -84,29 +84,41 @@ void SerialHoTT_TLM::setRXMode()
 
 void SerialHoTT_TLM::processBytes(uint8_t *bytes, u_int16_t size)
 {
-    hottInputBuffer.pushBytes(bytes, size);
-
-    uint8_t bufferSize = hottInputBuffer.size();
-
-    if (bufferSize == sizeof(hottBusFrame))
+    // process incoming bytes if there are any
+    if (size != 0)
     {
-        // frame complete, prepare to poll next device after lead out time elapsed
-        lastPoll = millis() - HOTT_POLL_RATE + HOTT_LEAD_OUT;
+        hottInputBuffer.pushBytes(bytes, size);
 
-        // fetch received serial data
-        hottInputBuffer.popBytes((uint8_t *)&hottBusFrame, bufferSize);
+        uint8_t bufferSize = hottInputBuffer.size();
 
-        // process received frame if CRC is ok
-        if (hottBusFrame.payload[STARTBYTE_INDEX] == START_FRAME_B &&
-            hottBusFrame.payload[ENDBYTE_INDEX] == END_FRAME &&
-            hottBusFrame.payload[CRC_INDEX] == calcFrameCRC((uint8_t *)&hottBusFrame.payload))
+        if (bufferSize == sizeof(hottBusFrame))
         {
-            processFrame();
+            // frame complete, prepare to poll next device after lead out time elapsed
+            lastPoll = millis() - HOTT_POLL_RATE + HOTT_LEAD_OUT;
+
+            // fetch received serial data
+            hottInputBuffer.popBytes((uint8_t *)&hottBusFrame, bufferSize);
+
+            // process received frame if CRC is ok
+            if (hottBusFrame.payload[STARTBYTE_INDEX] == START_FRAME_B &&
+                hottBusFrame.payload[ENDBYTE_INDEX] == END_FRAME &&
+                hottBusFrame.payload[CRC_INDEX] == calcFrameCRC((uint8_t *)&hottBusFrame.payload))
+            {
+                processFrame();
+            }
         }
     }
+
+    // run main processing
+    HoTTMainLoop();
 }
 
 void SerialHoTT_TLM::sendQueuedData(uint32_t maxBytesToSend)
+{
+    (void)maxBytesToSend;
+}
+
+void SerialHoTT_TLM::HoTTMainLoop()
 {
     uint32_t now = millis();
 
