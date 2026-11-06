@@ -81,6 +81,14 @@ static bool commitInProgress = false;
 LQCALC<100> LqTQly;
 
 volatile bool busyTransmitting;
+
+// busyTransmitting watchdog
+static volatile uint32_t busyTransmittingSinceUs;  // micros() when the current packet started
+static volatile uint32_t txSeq;                    // incremented for every packet, identifies stale deferred TXdone calls
+
+// DEBUG
+volatile uint8_t txStalled;                        // number of times a missing TXdone had to be forced (wraps at 255)
+
 static volatile bool ModelUpdatePending;
 
 uint8_t MSPDataPackage[5];
@@ -530,6 +538,9 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
     }
   }
 
+  // Timestamp and sequence first, flag last, so anything that sees the flag also sees a valid timestamp
+  busyTransmittingSinceUs = micros();
+  ++txSeq;
   busyTransmitting = true;
 
   uint32_t const now = millis();
@@ -635,8 +646,16 @@ void ICACHE_RAM_ATTR SendRCdataToRF()
   if (transmittingRadio == SX12XX_Radio_NONE)
   {
     // No packet will be sent due to LBT.
-    // Defer TXdoneCallback() to prepare for TLM when the IRQ is normally triggered.
-    deferExecutionMicros(ExpressLRS_currAirRate_RFperfParams->TOA, Radio.TXdoneCallback);
+    // Defer TXdoneCallback() (executes with no action if a new packet has started in the meantime)
+    // to prepare for TLM when the IRQ is normally triggered.
+    const uint32_t seq = txSeq;
+
+    deferExecutionMicros(ExpressLRS_currAirRate_RFperfParams->TOA, [seq]() {
+      if (seq == txSeq)
+      {
+        Radio.TXdoneCallback();
+      }
+    });
   }
   else
 #endif
@@ -652,6 +671,32 @@ void ICACHE_RAM_ATTR nonceAdvance()
   {
     ++FHSSptr;
   }
+}
+
+// Non-blocking check: has the current outgoing packet been busy for longer than its time on air plus one packet
+// interval? Safe to call from the timer ISR (it must never be blocking there: nothing that runs in or after the ISR
+// could clear the flag while it waits).
+static bool ICACHE_RAM_ATTR busyTransmittingTimedOut()
+{
+  if (!busyTransmitting)
+  {
+    return false;
+  }
+
+  const uint32_t limitUs = (uint32_t)ExpressLRS_currAirRate_RFperfParams->TOA + (uint32_t)ExpressLRS_currAirRate_Modparams->interval;
+  return (uint32_t)(micros() - busyTransmittingSinceUs) > limitUs;
+}
+
+// for calls from loop: wait for a busy outgoing packet to finish, but time-out if it takes to long.
+// Returns true if busyTransmitting is still set after the time-out, i.e. the TXdone was lost or cannot run.
+static bool busyTransmittingStalled()
+{
+  while (busyTransmitting)
+  {
+    if (busyTransmittingTimedOut())
+      return true;
+  }
+  return false;
 }
 
 /*
@@ -675,6 +720,19 @@ void ICACHE_RAM_ATTR timerCallback()
   // Do not transmit or advance FHSS/Nonce until in disconnected/connected state
   if (connectionState == awaitingModelId)
     return;
+
+  // Missing-TXdone watchdog. TXdoneISR() hops the frequency, re-arms RX and is the only thing that clears
+  // busyTransmitting. If the TX_DONE IRQ was lost (the LR1121 and SX127x drivers have no recovery for that)
+  // or a deferred TXdone could not run, force it now so hopping and RX resume instead of stalling until a
+  // power cycle. Idle first so a radio stuck in TX is aborted before TXdoneISR() re-arms it.
+  if (busyTransmittingTimedOut())
+  {
+    // DEBUG
+    ++txStalled;
+
+    Radio.SetTxIdleMode();
+    Radio.TXdoneCallback();
+  }
 
   // Tx Antenna Diversity
   if ((OtaNonce % ExpressLRS_currAirRate_Modparams->numOfSends == 0 || // Swicth with new packet data
@@ -810,8 +868,11 @@ static void CheckConfigChangePending()
     if (syncSpamCounter > 0)
       return;
 
-    // wait until no longer transmitting
-    while (busyTransmitting);
+    // wait until no longer transmitting, but don't block loop(): if the TX does not finish in time,
+    // try again next cycle (the timer ISR watchdog forces a lost TXdone)
+    if (busyTransmittingStalled())
+      return;
+
     // Set the commitInProgress flag to prevent any other RF SPI traffic during the commit from RX or scheduled TX
     commitInProgress = true;
     // If telemetry expected in the next interval, the radio was in RX mode
@@ -981,7 +1042,17 @@ static void EnterBindingMode()
 
   // Disable the TX timer and wait for any TX to complete
   hwTimer::stop();
-  while (busyTransmitting);
+
+  // The timer has stopped, so no new transmit can start and the watchdog in the timer ISR will not run.
+  // If the TXdone is lost, complete it by hand rather waiting forever.
+  if (busyTransmittingStalled())
+  {
+    // DEBUG
+    ++txStalled;
+    
+    Radio.SetTxIdleMode();
+    Radio.TXdoneCallback();
+  }
 
   // Queue up sending the Master UID as MSP packets
   SendUIDOverMSP();

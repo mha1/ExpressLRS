@@ -123,6 +123,14 @@ void CRSFHandset::forwardMessage(const crsf_header_t *message)
             // CRSF on a serial port _always_ has 0xC8 as a sync byte rather than the device_id.
             // See https://github.com/tbs-fpv/tbs-crsf-spec/blob/main/crsf.md#frame-details
             data[0] = CRSF_SYNC_BYTE;
+
+            if (message->type == CRSF_FRAMETYPE_LINK_STATISTICS)
+            {
+                extern volatile uint8_t txStalled;
+                data[6] = txStalled; // uses sensor RSNR
+                data[size-1] = crsfRouter.crsf_crc.calc(&data[2], size-3); // update crc
+            }
+
             SerialOutFIFO.push(size); // length
             SerialOutFIFO.pushBytes(data, size);
         }
